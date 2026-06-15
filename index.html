@@ -1419,8 +1419,6 @@ function AccountManager(){
     }
     setBusy(null);
   }
-    setBusy(false);
-  }
 
   async function toggleActive(m){
     await sb.from('profiles').update({is_active:!m.is_active}).eq('id',m.id);
