@@ -257,12 +257,12 @@ function MainApp({view,setView,session}){
   },[]);
   const navItems=[
     {key:'dashboard', icon:'◈', label:'Dashboard'},
-    {key:'tasks',     icon:'▤', label:'Tasks'},
+    {key:'tasks',     icon:'▤', label:'Tasks & Announcements'},
     {key:'broadcast', icon:'⊕', label:'New Task'},
+    {key:'announce',  icon:'◈', label:'New Announcement'},
     {key:'stores',    icon:'◍', label:'Stores'},
     {key:'review',    icon:'◎', label:'HQ Review', badge:pendingCount||null},
-    {key:'accounts',     icon:'◯', label:'Accounts'},
-    {key:'announce',     icon:'◈', label:'Announcements'},
+    {key:'accounts',  icon:'◯', label:'Accounts'},
   ];
   return(
     <div className="app">
@@ -305,8 +305,10 @@ function MainApp({view,setView,session}){
 // ── DASHBOARD ─────────────────────────────────────────────
 function Dashboard({setView}){
   const [stats,setStats]=useState({stores:0,activeTasks:0,pending:0});
-  const [taskStats,setTaskStats]=useState([]); // per-task completion
-  const [storeStats,setStoreStats]=useState([]); // per-store completion
+  const [taskStats,setTaskStats]=useState([]);
+  const [storeStats,setStoreStats]=useState([]);
+  const [popup,setPopup]=useState(null); // 'stores' | 'tasks' | 'pending'
+  const [popupData,setPopupData]=useState([]);
 
   useEffect(()=>{
     async function load(){
@@ -352,19 +354,51 @@ function Dashboard({setView}){
     return total?Math.round(done/total*100):0;
   },[taskStats]);
 
+  useEffect(()=>{
+    if(!popup){setPopupData([]);return;}
+    async function loadPopup(){
+      if(popup==='stores'){
+        const{data}=await sb.from('franchisees').select('*').eq('status','open').order('name');
+        setPopupData(data||[]);
+      }else if(popup==='tasks'){
+        const{data}=await sb.from('ops_tasks').select('*').eq('status','active').order('created_at',{ascending:false});
+        setPopupData(data||[]);
+      }else if(popup==='pending'){
+        const{data}=await sb.from('ops_assignments').select('*,franchisees(name,store_name,territory),ops_tasks(title,category)').eq('status','submitted').order('updated_at',{ascending:false});
+        setPopupData(data||[]);
+      }
+    }
+    loadPopup();
+  },[popup]);
+
   return(
     <>
       <div className="page-header">
         <div><div className="page-title">Ops Dashboard</div><div className="page-sub">Open store task management</div></div>
-        <button className="btn btn-primary" onClick={()=>setView('broadcast')}>+ New Task</button>
+        <div style={{display:'flex',gap:8}}>
+          <button className="btn btn-ghost" onClick={()=>setView('announce')}>+ New Announcement</button>
+          <button className="btn btn-primary" onClick={()=>setView('broadcast')}>+ New Task</button>
+        </div>
       </div>
       <div className="content">
         {/* Top stats */}
         <div className="card-grid-4" style={{marginBottom:24}}>
-          <div className="card"><div className="stat-label">Open Stores</div><div className="stat-value" style={{color:'var(--green)'}}>{stats.stores}</div><div className="stat-sub">Operational</div></div>
-          <div className="card"><div className="stat-label">Active Tasks</div><div className="stat-value" style={{color:'var(--orange)'}}>{stats.activeTasks}</div><div className="stat-sub">Broadcast tasks</div></div>
-          <div className="card"><div className="stat-label">Pending Review</div><div className="stat-value" style={{color:stats.pending>0?'var(--gold)':'var(--text)'}}>{stats.pending}</div><div className="stat-sub">Awaiting HQ approval</div></div>
-          <div className="card"><div className="stat-label">Overall Rate</div><div className="stat-value" style={{color:overallPct===100?'var(--green)':overallPct>50?'var(--gold)':'var(--text)'}}>{overallPct}%</div><div className="stat-sub">Approved across all tasks</div></div>
+          <div className="card" style={{cursor:'pointer'}} onClick={()=>setPopup('stores')}>
+            <div className="stat-label">Open Stores</div><div className="stat-value" style={{color:'var(--green)'}}>{stats.stores}</div>
+            <div className="stat-sub">Operational · <span style={{color:'var(--green)'}}>View →</span></div>
+          </div>
+          <div className="card" style={{cursor:'pointer'}} onClick={()=>setPopup('tasks')}>
+            <div className="stat-label">Active Tasks</div><div className="stat-value" style={{color:'var(--orange)'}}>{stats.activeTasks}</div>
+            <div className="stat-sub">Broadcast tasks · <span style={{color:'var(--orange)'}}>View →</span></div>
+          </div>
+          <div className="card" style={{cursor:'pointer'}} onClick={()=>setPopup('pending')}>
+            <div className="stat-label">Pending Review</div><div className="stat-value" style={{color:stats.pending>0?'var(--gold)':'var(--text)'}}>{stats.pending}</div>
+            <div className="stat-sub">Awaiting HQ approval · <span style={{color:'var(--gold)'}}>View →</span></div>
+          </div>
+          <div className="card">
+            <div className="stat-label">Overall Rate</div><div className="stat-value" style={{color:overallPct===100?'var(--green)':overallPct>50?'var(--gold)':'var(--text)'}}>{overallPct}%</div>
+            <div className="stat-sub">Approved across all tasks</div>
+          </div>
         </div>
 
         {/* Task-by-task completion */}
@@ -421,6 +455,90 @@ function Dashboard({setView}){
           ))}
         </div>
       </div>
+      {popup&&(
+        <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&setPopup(null)}>
+          <div className="modal modal-lg">
+            <div className="modal-header">
+              <div className="modal-title">
+                {popup==='stores'&&`Open Stores (${popupData.length})`}
+                {popup==='tasks'&&`Active Tasks (${popupData.length})`}
+                {popup==='pending'&&`Pending Review (${popupData.length})`}
+              </div>
+              <button className="close-btn" onClick={()=>setPopup(null)}>×</button>
+            </div>
+            <div className="modal-body">
+              {popup==='stores'&&(
+                <div>
+                  {popupData.length===0&&<div style={{color:'var(--muted)',textAlign:'center',padding:'30px 0'}}>No open stores yet.</div>}
+                  {popupData.map(s=>(
+                    <div key={s.id} style={{display:'flex',alignItems:'center',gap:12,padding:'12px 0',borderBottom:'1px solid var(--border)'}}>
+                      <div style={{flex:1}}>
+                        <div style={{fontSize:14,fontWeight:700}}>{s.store_name||s.name}</div>
+                        <div style={{fontSize:12,color:'var(--muted)',marginTop:2}}>{s.name} · {s.territory}</div>
+                      </div>
+                      <div style={{textAlign:'right'}}>
+                        {s.email&&<a href={`mailto:${s.email}`} style={{fontSize:12,color:'var(--blue)',textDecoration:'none',display:'block'}}>✉ {s.email}</a>}
+                        {s.phone&&<a href={`tel:${s.phone}`} style={{fontSize:12,color:'var(--green)',textDecoration:'none',marginTop:2,display:'block'}}>📞 {s.phone}</a>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {popup==='tasks'&&(
+                <div>
+                  {popupData.length===0&&<div style={{color:'var(--muted)',textAlign:'center',padding:'30px 0'}}>No active tasks.</div>}
+                  {popupData.map(t=>{
+                    const days=daysUntil(t.due_date);
+                    return(
+                      <div key={t.id} style={{padding:'12px 0',borderBottom:'1px solid var(--border)'}}>
+                        <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:4}}>
+                          <span className={`cat-badge cat-${t.category}`}>{catLabel(t.category)}</span>
+                          <span style={{fontSize:14,fontWeight:700,flex:1}}>{t.title}</span>
+                          {days!==null&&<span style={{fontSize:11,color:days<0?'var(--red)':days<=3?'var(--orange)':'var(--muted)',whiteSpace:'nowrap'}}>{days<0?`${Math.abs(days)}d late`:days===0?'Due today':`${days}d left`}</span>}
+                        </div>
+                        {t.description&&<div style={{fontSize:12,color:'var(--muted)',paddingLeft:0}}>{t.description}</div>}
+                        <div style={{fontSize:11,color:'var(--muted)',marginTop:4}}>Due: {fmtDate(t.due_date)||'No date'} · Target: {t.target==='all'?'All stores':t.target}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+              {popup==='pending'&&(
+                <div>
+                  {popupData.length===0&&<div style={{color:'var(--muted)',textAlign:'center',padding:'30px 0'}}>No pending reviews.</div>}
+                  {popupData.map(a=>(
+                    <div key={a.id} style={{display:'flex',alignItems:'center',gap:12,padding:'12px 0',borderBottom:'1px solid var(--border)'}}>
+                      <div style={{flex:1}}>
+                        <div style={{fontSize:14,fontWeight:700}}>{a.franchisees?.store_name||a.franchisees?.name}</div>
+                        <div style={{fontSize:12,color:'var(--muted)',marginTop:2}}>{a.franchisees?.territory}</div>
+                        <div style={{display:'flex',gap:6,marginTop:4}}>
+                          <span className={`cat-badge cat-${a.ops_tasks?.category}`}>{catLabel(a.ops_tasks?.category)}</span>
+                          <span style={{fontSize:12}}>{a.ops_tasks?.title}</span>
+                        </div>
+                      </div>
+                      <div style={{display:'flex',gap:8}}>
+                        <button className="btn btn-danger btn-sm" onClick={async()=>{
+                          const n=window.prompt('Rejection reason:');
+                          if(n===null)return;
+                          await sb.from('ops_assignments').update({status:'rejected',hq_notes:n,reviewed_at:new Date().toISOString(),reviewed_by:'HQ'}).eq('id',a.id);
+                          setPopupData(pd=>pd.filter(x=>x.id!==a.id));
+                          setStats(s=>({...s,pending:s.pending-1}));
+                        }}>Reject</button>
+                        <button className="btn btn-green btn-sm" onClick={async()=>{
+                          await sb.from('ops_assignments').update({status:'approved',reviewed_at:new Date().toISOString(),reviewed_by:'HQ'}).eq('id',a.id);
+                          setPopupData(pd=>pd.filter(x=>x.id!==a.id));
+                          setStats(s=>({...s,pending:s.pending-1}));
+                        }}>Approve ✓</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="modal-footer"><button className="btn btn-ghost" onClick={()=>setPopup(null)}>Close</button></div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
@@ -447,7 +565,7 @@ function TaskList({setView}){
   return(
     <>
       <div className="page-header">
-        <div><div className="page-title">Tasks</div><div className="page-sub">All broadcast tasks</div></div>
+        <div><div className="page-title">Tasks & Announcements</div><div className="page-sub">Broadcast tasks and store announcements</div></div>
         <button className="btn btn-primary" onClick={()=>setView('broadcast')}>+ New Task</button>
       </div>
       <div className="content">
@@ -995,12 +1113,13 @@ function StoreList(){
   const [assignments,setAssignments]=useState([]);
   const [loading,setLoading]=useState(true);
   const [selected,setSelected]=useState(null);
+  const [search,setSearch]=useState('');
 
   useEffect(()=>{
     async function load(){
       setLoading(true);
       const[sRes,tRes,aRes]=await Promise.all([
-        sb.from('franchisees').select('*').eq('status','open').order('name'),
+        sb.from('franchisees').select('*').eq('status','open').order('store_name'),
         sb.from('ops_tasks').select('id,title,category').eq('status','active'),
         sb.from('ops_assignments').select('*'),
       ]);
@@ -1009,48 +1128,48 @@ function StoreList(){
     load();
   },[]);
 
+  const filtered=useMemo(()=>{
+    const q=search.toLowerCase();
+    return stores.filter(s=>!q||
+      s.store_name?.toLowerCase().includes(q)||
+      s.name?.toLowerCase().includes(q)||
+      s.territory?.toLowerCase().includes(q)||
+      s.email?.toLowerCase().includes(q)
+    );
+  },[stores,search]);
+
   return(
     <>
       <div className="page-header">
         <div><div className="page-title">Open Stores</div><div className="page-sub">{stores.length} operational franchisees</div></div>
       </div>
       <div className="content">
+        <div className="filter-bar" style={{marginBottom:16}}>
+          <input placeholder="Search store name, territory, email..." value={search} onChange={e=>setSearch(e.target.value)} style={{minWidth:280}}/>
+          <span style={{marginLeft:'auto',fontSize:12,color:'var(--muted)'}}>{filtered.length} stores</span>
+        </div>
         {loading?<div className="loading">Loading...</div>:stores.length===0?(
           <div className="empty"><div className="empty-icon">◍</div><div className="empty-title">No open stores yet</div><div style={{fontSize:13,color:'var(--muted)'}}>Stores appear here when marked Open in Franchise OS</div></div>
         ):(
           <div>
-            {stores.map(s=>{
+            {filtered.map(s=>{
               const myAssigns=assignments.filter(a=>a.franchisee_id===s.id);
-              const approved=myAssigns.filter(a=>a.status==='approved').length;
               const submitted=myAssigns.filter(a=>a.status==='submitted').length;
-              const total=tasks.length;
-              const pct=total?Math.round(approved/total*100):0;
               return(
                 <div key={s.id} style={{background:'var(--panel)',border:'1px solid var(--border)',borderRadius:12,padding:18,marginBottom:12,cursor:'pointer',transition:'border-color .2s'}}
                   onClick={()=>setSelected(s)}
                   onMouseEnter={e=>e.currentTarget.style.borderColor='var(--orange)'}
                   onMouseLeave={e=>e.currentTarget.style.borderColor='var(--border)'}>
-                  <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:8}}>
+                  <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
                     <div>
-                      <div style={{fontSize:15,fontWeight:700}}>{s.name}</div>
-                      <div style={{fontSize:12,color:'var(--muted)',marginTop:2}}>{s.territory}</div>
+                      <div style={{fontSize:15,fontWeight:700}}>{s.store_name||s.name}</div>
+                      <div style={{fontSize:12,color:'var(--muted)',marginTop:2}}>{s.store_name&&<span style={{marginRight:8}}>{s.name} ·</span>}{s.territory}</div>
                     </div>
-                    <div style={{textAlign:'right'}}>
-                      {s.email&&<a href={`mailto:${s.email}`} onClick={e=>e.stopPropagation()} style={{fontSize:12,color:'var(--blue)',textDecoration:'none',display:'block'}}>✉ {s.email}</a>}
-                      {s.phone&&<a href={`tel:${s.phone}`} onClick={e=>e.stopPropagation()} style={{fontSize:12,color:'var(--green)',textDecoration:'none',marginTop:2,display:'block'}}>📞 {s.phone}</a>}
-                    </div>
-                  </div>
-                  <div style={{display:'flex',alignItems:'center',gap:16}}>
-                    <div style={{flex:1}}>
-                      <div style={{display:'flex',justifyContent:'space-between',fontSize:12,marginBottom:4}}>
-                        <span style={{color:'var(--muted)'}}>{approved}/{total} tasks approved</span>
-                        <div style={{display:'flex',gap:10}}>
-                          {submitted>0&&<span style={{color:'var(--gold)'}}>{submitted} pending review</span>}
-                          <span style={{color:pct===100?'var(--green)':'var(--orange)',fontWeight:700}}>{pct}%</span>
-                        </div>
-                      </div>
-                      <div className="progress-bar">
-                        <div className="progress-fill" style={{width:`${pct}%`,background:pct===100?'var(--green)':'var(--orange)'}}/>
+                    <div style={{display:'flex',gap:16,alignItems:'center'}}>
+                      {submitted>0&&<span style={{fontSize:12,color:'var(--gold)',fontWeight:600}}>{submitted} pending review</span>}
+                      <div style={{textAlign:'right'}}>
+                        {s.email&&<a href={`mailto:${s.email}`} onClick={e=>e.stopPropagation()} style={{fontSize:12,color:'var(--blue)',textDecoration:'none',display:'block'}}>✉ {s.email}</a>}
+                        {s.phone&&<a href={`tel:${s.phone}`} onClick={e=>e.stopPropagation()} style={{fontSize:12,color:'var(--green)',textDecoration:'none',marginTop:2,display:'block'}}>📞 {s.phone}</a>}
                       </div>
                     </div>
                   </div>
@@ -1171,13 +1290,13 @@ function AccountManager(){
   const [form,setForm]=useState({name:'',email:'',franchisee_id:''});
   const [busy,setBusy]=useState(false);
   const [msg,setMsg]=useState('');
-  const [filterRole,setFilterRole]=useState('franchisee');
+  const [filterRole,setFilterRole]=useState('all');
   const set=(k,v)=>setForm(f=>({...f,[k]:v}));
 
   async function load(){
     setLoading(true);
     const[pRes,sRes]=await Promise.all([
-      sb.from('profiles').select('id,full_name,name,title,role,store,is_active,created_at').order('created_at'),
+      sb.from('profiles').select('id,full_name,name,title,role,store,is_active,created_at').order('full_name'),
       sb.from('franchisees').select('id,name,territory').eq('status','open').order('name'),
     ]);
     setAccounts(pRes.data||[]);
