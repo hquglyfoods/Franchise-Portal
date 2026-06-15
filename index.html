@@ -142,6 +142,7 @@ const SUPA_URL = "https://ciufbbdzekqlqdzodnrr.supabase.co";
 const SUPA_KEY = "sb_publishable_26hdkwY53clveH7bDPf21w_JGtrY1NP";
 const sb = supabase.createClient(SUPA_URL, SUPA_KEY);
 const EMAIL_FN = '/.netlify/functions/send-email';
+const AI_FN = '/.netlify/functions/chat';
 
 async function sendEmail(to, subject, html){
   try{
@@ -214,15 +215,35 @@ function daysUntil(d){if(!d)return null;return Math.ceil((new Date(d)-new Date()
 // ── APP ───────────────────────────────────────────────────
 function App(){
   const [session,setSession]=useState(null);
+  const [profile,setProfile]=useState(null);
   const [loading,setLoading]=useState(true);
   const [view,setView]=useState('dashboard');
+
   useEffect(()=>{
-    sb.auth.getSession().then(({data})=>{setSession(data.session);setLoading(false);});
-    const {data:{subscription}}=sb.auth.onAuthStateChange((_,s)=>setSession(s));
+    sb.auth.getSession().then(async({data})=>{
+      setSession(data.session);
+      if(data.session){
+        const{data:p}=await sb.from('profiles').select('*').eq('id',data.session.user.id).single();
+        setProfile(p||{role:'hq'});
+      }
+      setLoading(false);
+    });
+    const{data:{subscription}}=sb.auth.onAuthStateChange(async(_,s)=>{
+      setSession(s);
+      if(s){
+        const{data:p}=await sb.from('profiles').select('*').eq('id',s.user.id).single();
+        setProfile(p||{role:'hq'});
+      }else{
+        setProfile(null);
+      }
+    });
     return()=>subscription.unsubscribe();
   },[]);
+
   if(loading)return<div className="loading">Loading...</div>;
   if(!session)return<AuthScreen/>;
+  // Route by role
+  if(profile?.role==='franchisee')return<FranchiseePortal session={session} profile={profile}/>;
   return<MainApp view={view} setView={setView} session={session}/>;
 }
 
@@ -1843,6 +1864,484 @@ function ChangePassword({onDone}){
     </>
   );
 }
+
+// ── FRANCHISEE PORTAL ────────────────────────────────────
+function FranchiseePortal({session, profile}){
+  const [portalView,setPortalView]=useState('tasks');
+  const storeName=profile?.store||profile?.full_name||profile?.name||'My Store';
+
+  const navItems=[
+    {key:'tasks',    icon:'▤', label:'My Tasks'},
+    {key:'announce', icon:'◈', label:'Announcements'},
+    {key:'bot',      icon:'◉', label:'UglyBot'},
+    {key:'password', icon:'◎', label:'Settings'},
+  ];
+
+  return(
+    <div className="app">
+      <aside className="sidebar">
+        <div className="sidebar-logo">
+          <div className="brand">Ugly Donuts</div>
+          <div className="app-tag">{storeName}</div>
+        </div>
+        <nav className="nav">
+          {navItems.map(n=>(
+            <button key={n.key} className={`nav-item ${portalView===n.key?'active':''}`} onClick={()=>setPortalView(n.key)}>
+              <span style={{fontSize:15,width:20,textAlign:'center'}}>{n.icon}</span>{n.label}
+            </button>
+          ))}
+        </nav>
+        <div className="sidebar-footer">
+          <div style={{marginBottom:4,fontSize:11,color:'var(--muted)'}}>{session.user.email}</div>
+          <button onClick={()=>sb.auth.signOut()} style={{color:'var(--red)'}}>Sign out</button>
+        </div>
+      </aside>
+      <main className="main">
+        {portalView==='tasks'&&<FranchiseeTasks profile={profile}/>}
+        {portalView==='announce'&&<FranchiseeAnnouncements profile={profile}/>}
+        {portalView==='bot'&&<UglyBotPortal storeName={storeName}/>}
+        {portalView==='password'&&<ChangePassword onDone={()=>setPortalView('tasks')}/>}
+      </main>
+    </div>
+  );
+}
+
+// ── FRANCHISEE TASKS ──────────────────────────────────────
+function FranchiseeTasks({profile}){
+  const [assignments,setAssignments]=useState([]);
+  const [loading,setLoading]=useState(true);
+  const [selected,setSelected]=useState(null);
+  const [subtasksMap,setSubtasksMap]=useState({});
+  const [completionsMap,setCompletionsMap]=useState({});
+
+  async function load(){
+    setLoading(true);
+    // Find franchisee record by store name or email
+    const{data:fr}=await sb.from('franchisees').select('id,name,store_name').eq('status','open')
+      .or(`name.ilike.%${profile?.full_name||''}%,store_name.ilike.%${profile?.store||''}%`)
+      .limit(1).single();
+
+    if(!fr){setLoading(false);return;}
+
+    const{data:assigns}=await sb.from('ops_assignments')
+      .select('*,ops_tasks(title,description,category,due_date,require_hq_approval)')
+      .eq('franchisee_id',fr.id)
+      .neq('ops_tasks.status','archived')
+      .order('created_at',{ascending:false});
+
+    setAssignments(assigns||[]);
+
+    // Load subtasks and completions for each assignment
+    const stMap={},cMap={};
+    await Promise.all((assigns||[]).map(async a=>{
+      const[stRes,cRes]=await Promise.all([
+        sb.from('ops_subtasks').select('*').eq('ops_task_id',a.ops_task_id).order('sort_order'),
+        sb.from('ops_completions').select('*').eq('ops_assignment_id',a.id),
+      ]);
+      stMap[a.id]=stRes.data||[];
+      cMap[a.id]=cRes.data||[];
+    }));
+    setSubtasksMap(stMap);setCompletionsMap(cMap);
+    setLoading(false);
+  }
+  useEffect(()=>{load();},[]);
+
+  const statusColors={pending:'var(--muted)',in_progress:'var(--blue)',submitted:'var(--gold)',approved:'var(--green)',rejected:'var(--red)'};
+
+  return(
+    <>
+      <div className="page-header">
+        <div><div className="page-title">My Tasks</div><div className="page-sub">Tasks assigned by HQ</div></div>
+      </div>
+      <div className="content">
+        {loading?<div className="loading">Loading...</div>:assignments.length===0?(
+          <div className="empty"><div className="empty-icon">▤</div><div className="empty-title">No tasks yet</div><div style={{fontSize:13,color:'var(--muted)'}}>HQ will assign tasks here</div></div>
+        ):(
+          assignments.map(a=>(
+            <div key={a.id} style={{background:'var(--panel)',border:`1px solid ${a.status==='rejected'?'rgba(224,82,82,.3)':'var(--border)'}`,borderRadius:12,padding:18,marginBottom:12,cursor:'pointer',transition:'border-color .2s'}}
+              onClick={()=>setSelected(a)}
+              onMouseEnter={e=>e.currentTarget.style.borderColor='var(--orange)'}
+              onMouseLeave={e=>e.currentTarget.style.borderColor=a.status==='rejected'?'rgba(224,82,82,.3)':'var(--border)'}>
+              <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',marginBottom:8}}>
+                <div style={{display:'flex',gap:8,alignItems:'center'}}>
+                  <span className={`cat-badge cat-${a.ops_tasks?.category}`}>{catLabel(a.ops_tasks?.category)}</span>
+                  <span style={{fontSize:15,fontWeight:700}}>{a.ops_tasks?.title}</span>
+                </div>
+                <span style={{fontSize:12,fontWeight:700,color:statusColors[a.status],background:statusColors[a.status]+'22',padding:'2px 10px',borderRadius:999,whiteSpace:'nowrap'}}>
+                  {STATUS_LABELS[a.status]||a.status}
+                </span>
+              </div>
+              {a.ops_tasks?.description&&<div style={{fontSize:13,color:'var(--muted)',marginBottom:8}}>{a.ops_tasks.description}</div>}
+              {a.ops_tasks?.due_date&&<div style={{fontSize:12,color:daysUntil(a.ops_tasks.due_date)<0?'var(--red)':daysUntil(a.ops_tasks.due_date)<=3?'var(--orange)':'var(--muted)'}}>
+                Due: {fmtDate(a.ops_tasks.due_date)} {daysUntil(a.ops_tasks.due_date)<0&&'· OVERDUE'}
+              </div>}
+              {a.status==='rejected'&&a.hq_notes&&(
+                <div style={{marginTop:8,padding:10,background:'rgba(224,82,82,.08)',border:'1px solid rgba(224,82,82,.2)',borderRadius:6,fontSize:12,color:'var(--red)'}}>
+                  HQ Feedback: {a.hq_notes}
+                </div>
+              )}
+              {(subtasksMap[a.id]||[]).length>0&&(
+                <div style={{marginTop:8,fontSize:12,color:'var(--muted)'}}>
+                  {(completionsMap[a.id]||[]).filter(c=>c.completed).length}/{(subtasksMap[a.id]||[]).length} sub-tasks complete
+                </div>
+              )}
+            </div>
+          ))
+        )}
+      </div>
+      {selected&&<FranchiseeTaskModal assignment={selected} subtasks={subtasksMap[selected.id]||[]} completions={completionsMap[selected.id]||[]} onClose={()=>{setSelected(null);load();}}/>}
+    </>
+  );
+}
+
+// ── FRANCHISEE TASK MODAL ─────────────────────────────────
+function FranchiseeTaskModal({assignment,subtasks,completions,onClose}){
+  const [comps,setComps]=useState(completions);
+  const [busy,setBusy]=useState(false);
+  const [uploadingId,setUploadingId]=useState(null);
+  const [textInputs,setTextInputs]=useState({});
+
+  async function toggleSubtask(st){
+    const existing=comps.find(c=>c.ops_subtask_id===st.id);
+    if(existing?.completed)return; // can't uncheck
+    setBusy(true);
+    if(existing){
+      await sb.from('ops_completions').update({completed:true,completed_at:new Date().toISOString()}).eq('id',existing.id);
+    }else{
+      await sb.from('ops_completions').insert([{ops_assignment_id:assignment.id,ops_subtask_id:st.id,completed:true,completed_at:new Date().toISOString()}]);
+    }
+    const{data}=await sb.from('ops_completions').select('*').eq('ops_assignment_id',assignment.id);
+    setComps(data||[]);
+    setBusy(false);
+  }
+
+  async function uploadProof(st, file){
+    setUploadingId(st.id);
+    const path=`proofs/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9._-]/g,'_')}`;
+    const{error}=await sb.storage.from('ops-proofs').upload(path,file,{contentType:file.type});
+    if(error){alert('Upload failed: '+error.message);setUploadingId(null);return;}
+    const{data:urlData}=sb.storage.from('ops-proofs').getPublicUrl(path);
+    // Save completion with proof
+    const existing=comps.find(c=>c.ops_subtask_id===st.id);
+    if(existing){
+      await sb.from('ops_completions').update({completed:true,completed_at:new Date().toISOString(),proof_image_url:urlData.publicUrl,proof_text:textInputs[st.id]||null}).eq('id',existing.id);
+    }else{
+      await sb.from('ops_completions').insert([{ops_assignment_id:assignment.id,ops_subtask_id:st.id,completed:true,completed_at:new Date().toISOString(),proof_image_url:urlData.publicUrl,proof_text:textInputs[st.id]||null}]);
+    }
+    const{data}=await sb.from('ops_completions').select('*').eq('ops_assignment_id',assignment.id);
+    setComps(data||[]);
+    setUploadingId(null);
+  }
+
+  async function saveTextProof(st){
+    const text=textInputs[st.id];
+    if(!text?.trim())return;
+    setBusy(true);
+    const existing=comps.find(c=>c.ops_subtask_id===st.id);
+    if(existing){
+      await sb.from('ops_completions').update({completed:true,completed_at:new Date().toISOString(),proof_text:text}).eq('id',existing.id);
+    }else{
+      await sb.from('ops_completions').insert([{ops_assignment_id:assignment.id,ops_subtask_id:st.id,completed:true,completed_at:new Date().toISOString(),proof_text:text}]);
+    }
+    const{data}=await sb.from('ops_completions').select('*').eq('ops_assignment_id',assignment.id);
+    setComps(data||[]);
+    setBusy(false);
+  }
+
+  async function submitToHQ(){
+    if(!window.confirm('Submit all completed tasks to HQ for review?'))return;
+    setBusy(true);
+    await sb.from('ops_assignments').update({status:assignment.ops_tasks?.require_hq_approval?'submitted':'approved',updated_at:new Date().toISOString()}).eq('id',assignment.id);
+    setBusy(false);onClose();
+  }
+
+  const allRequired=subtasks.filter(s=>s.is_required);
+  const allRequiredDone=allRequired.every(s=>comps.find(c=>c.ops_subtask_id===s.id&&c.completed));
+  const totalDone=comps.filter(c=>c.completed).length;
+  const pct=subtasks.length?Math.round(totalDone/subtasks.length*100):0;
+  const canSubmit=assignment.status==='pending'||assignment.status==='in_progress'||assignment.status==='rejected';
+
+  return(
+    <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
+      <div className="modal modal-lg">
+        <div className="modal-header">
+          <div>
+            <div style={{display:'flex',gap:8,marginBottom:4}}>
+              <span className={`cat-badge cat-${assignment.ops_tasks?.category}`}>{catLabel(assignment.ops_tasks?.category)}</span>
+            </div>
+            <div className="modal-title">{assignment.ops_tasks?.title}</div>
+            {assignment.ops_tasks?.description&&<div style={{fontSize:12,color:'var(--muted)',marginTop:3}}>{assignment.ops_tasks.description}</div>}
+          </div>
+          <button className="close-btn" onClick={onClose}>×</button>
+        </div>
+        <div className="modal-body">
+          {assignment.status==='rejected'&&assignment.hq_notes&&(
+            <div style={{marginBottom:16,padding:12,background:'rgba(224,82,82,.08)',border:'1px solid rgba(224,82,82,.2)',borderRadius:8,fontSize:13,color:'var(--red)'}}>
+              <strong>HQ Feedback:</strong> {assignment.hq_notes}
+            </div>
+          )}
+          {assignment.status==='approved'&&(
+            <div style={{marginBottom:16,padding:12,background:'rgba(95,184,122,.08)',border:'1px solid rgba(95,184,122,.2)',borderRadius:8,fontSize:13,color:'var(--green)',textAlign:'center',fontWeight:700}}>
+              ✓ Approved by HQ
+            </div>
+          )}
+
+          <div style={{marginBottom:16}}>
+            <div style={{display:'flex',justifyContent:'space-between',fontSize:12,marginBottom:4}}>
+              <span style={{color:'var(--muted)'}}>{totalDone}/{subtasks.length} complete</span>
+              <span style={{fontWeight:700,color:pct===100?'var(--green)':'var(--orange)'}}>{pct}%</span>
+            </div>
+            <div className="progress-bar"><div className="progress-fill" style={{width:`${pct}%`,background:pct===100?'var(--green)':'var(--orange)'}}/></div>
+          </div>
+
+          {subtasks.map(st=>{
+            const comp=comps.find(c=>c.ops_subtask_id===st.id);
+            const done=comp?.completed;
+            return(
+              <div key={st.id} style={{padding:'14px 0',borderBottom:'1px solid var(--border)'}}>
+                <div style={{display:'flex',alignItems:'flex-start',gap:10,marginBottom:done?8:12}}>
+                  <div style={{width:22,height:22,borderRadius:5,background:done?'var(--green)':'var(--panel2)',border:`2px solid ${done?'var(--green)':'var(--border2)'}`,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,marginTop:1}}>
+                    {done&&<span style={{fontSize:13,color:'#000',fontWeight:700}}>✓</span>}
+                  </div>
+                  <div style={{flex:1}}>
+                    <div style={{fontSize:13,fontWeight:600,color:done?'var(--muted)':'var(--text)',textDecoration:done?'line-through':'none'}}>{st.title}</div>
+                    {st.description&&<div style={{fontSize:11,color:'var(--muted)',marginTop:2}}>{st.description}</div>}
+                    <div style={{fontSize:10,color:'var(--muted2)',marginTop:2}}>{PROOF_TYPES.find(p=>p.key===st.proof_type)?.label}{st.is_required&&<span style={{color:'var(--red)',marginLeft:4}}>*Required</span>}</div>
+                  </div>
+                </div>
+
+                {/* Proof area */}
+                {!done&&canSubmit&&(
+                  <div style={{paddingLeft:32}}>
+                    {st.proof_type==='photo'&&(
+                      <label style={{display:'inline-flex',alignItems:'center',gap:8,background:'var(--panel2)',border:'1px dashed var(--border2)',borderRadius:8,padding:'8px 14px',cursor:'pointer',fontSize:13,color:'var(--muted)'}}>
+                        {uploadingId===st.id?'Uploading...':'📷 Upload Photo'}
+                        <input type="file" accept="image/*" onChange={e=>e.target.files[0]&&uploadProof(st,e.target.files[0])} style={{display:'none'}} disabled={uploadingId===st.id}/>
+                      </label>
+                    )}
+                    {st.proof_type==='text'&&(
+                      <div style={{display:'flex',gap:8}}>
+                        <input value={textInputs[st.id]||''} onChange={e=>setTextInputs(t=>({...t,[st.id]:e.target.value}))} placeholder="Enter confirmation..." style={{flex:1,background:'var(--panel2)',border:'1px solid var(--border2)',borderRadius:8,padding:'8px 12px',color:'var(--text)',fontFamily:'inherit',fontSize:13,outline:'none'}}/>
+                        <button className="btn btn-primary btn-sm" onClick={()=>saveTextProof(st)} disabled={busy}>Submit</button>
+                      </div>
+                    )}
+                    {st.proof_type==='checkbox'&&(
+                      <button className="btn btn-ghost btn-sm" onClick={()=>toggleSubtask(st)} disabled={busy}>Mark Complete</button>
+                    )}
+                  </div>
+                )}
+
+                {/* Show proof */}
+                {done&&(
+                  <div style={{paddingLeft:32}}>
+                    {comp.proof_image_url&&<img src={comp.proof_image_url} alt="proof" style={{maxWidth:200,maxHeight:150,borderRadius:6,objectFit:'cover',border:'1px solid var(--border)'}}/>}
+                    {comp.proof_text&&<div style={{fontSize:12,color:'var(--muted)',fontStyle:'italic'}}>{comp.proof_text}</div>}
+                    {!comp.proof_image_url&&!comp.proof_text&&<div style={{fontSize:11,color:'var(--muted)'}}>Marked complete</div>}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+        <div className="modal-footer">
+          <button className="btn btn-ghost" onClick={onClose}>Close</button>
+          {canSubmit&&(
+            <button className="btn btn-primary" onClick={submitToHQ} disabled={busy||!allRequiredDone}>
+              {busy?'Submitting...':assignment.ops_tasks?.require_hq_approval?'Submit to HQ for Approval →':'Mark as Complete →'}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── FRANCHISEE ANNOUNCEMENTS ──────────────────────────────
+function FranchiseeAnnouncements({profile}){
+  const [announcements,setAnnouncements]=useState([]);
+  const [receipts,setReceipts]=useState([]);
+  const [loading,setLoading]=useState(true);
+  const [franchiseeId,setFranchiseeId]=useState(null);
+
+  useEffect(()=>{
+    async function load(){
+      setLoading(true);
+      const{data:fr}=await sb.from('franchisees').select('id').eq('status','open')
+        .or(`name.ilike.%${profile?.full_name||''}%,store_name.ilike.%${profile?.store||''}%`)
+        .limit(1).single();
+      const frId=fr?.id;
+      setFranchiseeId(frId);
+
+      const[aRes,rRes]=await Promise.all([
+        sb.from('ops_announcements').select('*').eq('status','active').order('created_at',{ascending:false}),
+        frId?sb.from('ops_announcement_receipts').select('*').eq('franchisee_id',frId):{data:[]},
+      ]);
+      setAnnouncements(aRes.data||[]);
+      setReceipts(rRes.data||[]);
+      setLoading(false);
+    }
+    load();
+  },[]);
+
+  async function confirm(annId){
+    if(!franchiseeId)return;
+    const existing=receipts.find(r=>r.announcement_id===annId);
+    if(existing?.confirmed)return;
+    if(existing){
+      await sb.from('ops_announcement_receipts').update({confirmed:true,confirmed_at:new Date().toISOString()}).eq('id',existing.id);
+    }else{
+      await sb.from('ops_announcement_receipts').insert([{announcement_id:annId,franchisee_id:franchiseeId,confirmed:true,confirmed_at:new Date().toISOString()}]);
+    }
+    const{data}=await sb.from('ops_announcement_receipts').select('*').eq('franchisee_id',franchiseeId);
+    setReceipts(data||[]);
+  }
+
+  const ANN_CATS=[
+    {key:'general',label:'General',color:'#5B8FD4'},
+    {key:'urgent',label:'Urgent',color:'#E05252'},
+    {key:'menu',label:'Menu Update',color:'#CC9C3A'},
+    {key:'policy',label:'Policy',color:'#9B78D4'},
+  ];
+  function catColor(k){return ANN_CATS.find(c=>c.key===k)?.color||'#5B8FD4';}
+  function catLbl(k){return ANN_CATS.find(c=>c.key===k)?.label||k;}
+
+  return(
+    <>
+      <div className="page-header">
+        <div><div className="page-title">Announcements</div><div className="page-sub">Messages from HQ</div></div>
+      </div>
+      <div className="content">
+        {loading?<div className="loading">Loading...</div>:announcements.length===0?(
+          <div className="empty"><div className="empty-icon">◈</div><div className="empty-title">No announcements</div></div>
+        ):(
+          announcements.map(ann=>{
+            const receipt=receipts.find(r=>r.announcement_id===ann.id);
+            const confirmed=receipt?.confirmed;
+            const color=catColor(ann.category);
+            return(
+              <div key={ann.id} style={{background:'var(--panel)',border:`1px solid ${confirmed?'rgba(95,184,122,.3)':'var(--border)'}`,borderLeft:`3px solid ${color}`,borderRadius:12,padding:18,marginBottom:12}}>
+                <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',marginBottom:8}}>
+                  <div style={{display:'flex',gap:8,alignItems:'center'}}>
+                    <span style={{fontSize:11,fontWeight:700,background:color+'22',color,padding:'2px 8px',borderRadius:999,textTransform:'uppercase'}}>{catLbl(ann.category)}</span>
+                    <span style={{fontSize:11,color:'var(--muted)'}}>{fmtDate(ann.created_at)}</span>
+                  </div>
+                  {confirmed
+                    ?<span style={{fontSize:12,color:'var(--green)',fontWeight:700}}>✓ Received</span>
+                    :<button className="btn btn-primary btn-sm" onClick={()=>confirm(ann.id)}>Confirm Receipt</button>
+                  }
+                </div>
+                <div style={{fontSize:16,fontWeight:700,marginBottom:8}}>{ann.title}</div>
+                <div style={{fontSize:13,color:'var(--muted)',lineHeight:1.6,whiteSpace:'pre-wrap',marginBottom:12}}>{ann.body}</div>
+                {/* Attachments */}
+                {(ann.attachment_url||ann.link_url)&&(
+                  <div style={{display:'flex',gap:8,flexWrap:'wrap',marginTop:8}}>
+                    {ann.attachment_url&&ann.attachment_type==='image'&&(
+                      <a href={ann.attachment_url} target="_blank" rel="noreferrer">
+                        <img src={ann.attachment_url} alt={ann.attachment_name} style={{maxHeight:160,maxWidth:260,borderRadius:6,objectFit:'cover',border:'1px solid var(--border)',cursor:'pointer'}}/>
+                      </a>
+                    )}
+                    {ann.attachment_url&&ann.attachment_type==='video'&&(
+                      <video src={ann.attachment_url} controls style={{maxHeight:200,maxWidth:320,borderRadius:6,border:'1px solid var(--border)'}}/>
+                    )}
+                    {ann.attachment_url&&(ann.attachment_type==='pdf'||ann.attachment_type==='file')&&(
+                      <a href={ann.attachment_url} target="_blank" rel="noreferrer" style={{display:'flex',alignItems:'center',gap:8,background:'rgba(204,156,58,.1)',border:'1px solid rgba(204,156,58,.3)',borderRadius:8,padding:'10px 16px',textDecoration:'none',color:'var(--gold)',fontSize:13,fontWeight:600}}>
+                        {ann.attachment_type==='pdf'?'📄':'📎'} {ann.attachment_name||'Download File'}
+                      </a>
+                    )}
+                    {ann.link_url&&(
+                      <a href={ann.link_url} target="_blank" rel="noreferrer" style={{display:'flex',alignItems:'center',gap:8,background:'rgba(155,120,212,.1)',border:'1px solid rgba(155,120,212,.3)',borderRadius:8,padding:'10px 16px',textDecoration:'none',color:'var(--purple)',fontSize:13,fontWeight:600}}>
+                        🔗 {ann.link_label||'View Link'}
+                      </a>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })
+        )}
+      </div>
+    </>
+  );
+}
+
+// ── UGLYBOT PORTAL ────────────────────────────────────────
+function UglyBotPortal({storeName}){
+  const [messages,setMessages]=useState([
+    {role:'assistant',content:`Hi! I'm UglyBot, your AI assistant for Ugly Donuts & Corn Dogs. How can I help you today?`}
+  ]);
+  const [input,setInput]=useState('');
+  const [busy,setBusy]=useState(false);
+  const messagesEndRef=React.useRef(null);
+
+  React.useEffect(()=>{
+    messagesEndRef.current?.scrollIntoView({behavior:'smooth'});
+  },[messages]);
+
+  async function send(){
+    if(!input.trim()||busy)return;
+    const userMsg={role:'user',content:input.trim()};
+    setMessages(m=>[...m,userMsg]);
+    setInput('');
+    setBusy(true);
+
+    try{
+      const res=await fetch(AI_FN,{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({
+          messages:[...messages,userMsg].map(m=>({role:m.role,content:m.content})),
+          store:storeName,
+        }),
+      });
+      const data=await res.json();
+      const reply=data.content||data.error||'Sorry, something went wrong.';
+      setMessages(m=>[...m,{role:'assistant',content:reply}]);
+    }catch(e){
+      setMessages(m=>[...m,{role:'assistant',content:'Connection error. Please try again.'}]);
+    }
+    setBusy(false);
+  }
+
+  return(
+    <>
+      <div className="page-header">
+        <div><div className="page-title">UglyBot</div><div className="page-sub">AI assistant for operations, recipes, and support</div></div>
+      </div>
+      <div style={{display:'flex',flexDirection:'column',height:'calc(100vh - 89px)'}}>
+        {/* Messages */}
+        <div style={{flex:1,overflowY:'auto',padding:'20px 32px'}}>
+          {messages.map((m,i)=>(
+            <div key={i} style={{display:'flex',gap:12,marginBottom:16,justifyContent:m.role==='user'?'flex-end':'flex-start'}}>
+              {m.role==='assistant'&&(
+                <div style={{width:32,height:32,borderRadius:'50%',background:'var(--orange)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:14,flexShrink:0,marginTop:2}}>🍩</div>
+              )}
+              <div style={{maxWidth:'70%',background:m.role==='user'?'var(--orange)':'var(--panel)',color:m.role==='user'?'#000':'var(--text)',padding:'12px 16px',borderRadius:m.role==='user'?'16px 16px 4px 16px':'16px 16px 16px 4px',fontSize:14,lineHeight:1.6,whiteSpace:'pre-wrap'}}>
+                {m.content}
+              </div>
+            </div>
+          ))}
+          {busy&&(
+            <div style={{display:'flex',gap:12,marginBottom:16}}>
+              <div style={{width:32,height:32,borderRadius:'50%',background:'var(--orange)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:14}}>🍩</div>
+              <div style={{background:'var(--panel)',padding:'12px 16px',borderRadius:'16px 16px 16px 4px',fontSize:14,color:'var(--muted)'}}>Thinking...</div>
+            </div>
+          )}
+          <div ref={messagesEndRef}/>
+        </div>
+        {/* Input */}
+        <div style={{padding:'16px 32px',borderTop:'1px solid var(--border)',background:'var(--panel)',display:'flex',gap:10}}>
+          <input value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>e.key==='Enter'&&!e.shiftKey&&send()}
+            placeholder="Ask about recipes, operations, procedures..." disabled={busy}
+            style={{flex:1,background:'var(--panel2)',border:'1px solid var(--border2)',borderRadius:10,padding:'12px 16px',color:'var(--text)',fontFamily:'inherit',fontSize:14,outline:'none'}}/>
+          <button className="btn btn-primary" onClick={send} disabled={busy||!input.trim()} style={{borderRadius:10,padding:'12px 20px'}}>
+            Send →
+          </button>
+        </div>
+      </div>
+    </>
+  );
+}
+
 
 ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
 </script>
