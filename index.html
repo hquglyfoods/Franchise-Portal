@@ -304,18 +304,45 @@ function AuthScreen(){
   const [pass,setPass]=useState('');
   const [err,setErr]=useState('');
   const [busy,setBusy]=useState(false);
+  const [mode,setMode]=useState('login'); // 'login' or 'forgot'
+  const [resetMsg,setResetMsg]=useState('');
   async function login(e){e.preventDefault();setBusy(true);setErr('');const{error}=await sb.auth.signInWithPassword({email,password:pass});if(error){setErr(error.message);setBusy(false);}}
+  async function sendReset(e){
+    e.preventDefault();
+    if(!email){setErr('Enter your email address.');return;}
+    setBusy(true);setErr('');setResetMsg('');
+    const{error}=await sb.auth.resetPasswordForEmail(email,{redirectTo:'https://uglyops.netlify.app'});
+    setBusy(false);
+    if(error){setErr(error.message);return;}
+    setResetMsg('If an account exists for '+email+', a password reset link has been sent. Check your email.');
+  }
   return(
     <div className="auth-wrap">
       <div className="auth-card">
         <div className="auth-logo">Ugly Donuts</div>
         <div className="auth-app">Franchise Ops</div>
-        <form onSubmit={login}>
-          <div className="form-group"><label>Email</label><input type="email" value={email} onChange={e=>setEmail(e.target.value)} autoFocus/></div>
-          <div className="form-group"><label>Password</label><input type="password" value={pass} onChange={e=>setPass(e.target.value)}/></div>
-          <button className="btn-gold" type="submit" disabled={busy}>{busy?'Signing in...':'Sign In'}</button>
-          {err&&<div className="auth-err">{err}</div>}
-        </form>
+        {mode==='login'?(
+          <form onSubmit={login}>
+            <div className="form-group"><label>Email</label><input type="email" value={email} onChange={e=>setEmail(e.target.value)} autoFocus/></div>
+            <div className="form-group"><label>Password</label><input type="password" value={pass} onChange={e=>setPass(e.target.value)}/></div>
+            <button className="btn-gold" type="submit" disabled={busy}>{busy?'Signing in...':'Sign In'}</button>
+            {err&&<div className="auth-err">{err}</div>}
+            <div style={{textAlign:'center',marginTop:16}}>
+              <button type="button" onClick={()=>{setMode('forgot');setErr('');setResetMsg('');}} style={{background:'none',border:'none',color:'var(--muted)',cursor:'pointer',fontSize:12,fontFamily:'inherit',textDecoration:'underline'}}>Forgot password?</button>
+            </div>
+          </form>
+        ):(
+          <form onSubmit={sendReset}>
+            <div style={{fontSize:13,color:'var(--muted)',marginBottom:16,lineHeight:1.5}}>Enter your email and we'll send you a link to reset your password.</div>
+            <div className="form-group"><label>Email</label><input type="email" value={email} onChange={e=>setEmail(e.target.value)} autoFocus/></div>
+            <button className="btn-gold" type="submit" disabled={busy}>{busy?'Sending...':'Send Reset Link'}</button>
+            {err&&<div className="auth-err">{err}</div>}
+            {resetMsg&&<div style={{color:'var(--green)',fontSize:13,marginTop:12,textAlign:'center',lineHeight:1.5}}>{resetMsg}</div>}
+            <div style={{textAlign:'center',marginTop:16}}>
+              <button type="button" onClick={()=>{setMode('login');setErr('');setResetMsg('');}} style={{background:'none',border:'none',color:'var(--muted)',cursor:'pointer',fontSize:12,fontFamily:'inherit',textDecoration:'underline'}}>← Back to login</button>
+            </div>
+          </form>
+        )}
       </div>
     </div>
   );
@@ -1630,14 +1657,13 @@ function WarningDetailModal({warning,onClose}){
 
   async function rescind(){
     if(!rescindReason.trim()){setMsg('Please provide a reason for rescinding.');return;}
-    setBusy(true);
+    setBusy(true);setMsg('');
     const{error}=await sb.from('ops_warnings').update({
       status:'rescinded',rescinded_reason:rescindReason.trim(),rescinded_at:new Date().toISOString(),
     }).eq('id',warning.id);
-    if(error){setMsg('Error: '+error.message);setBusy(false);return;}
-    setMsg('✓ Warning rescinded.');
-    setTimeout(()=>onClose(),700);
     setBusy(false);
+    if(error){setMsg('Error: '+error.message);return;}
+    onClose();
   }
 
   return(
@@ -1722,10 +1748,14 @@ function HQMessages({onBadgeRefresh}){
     return true;
   });
   const openCount=messages.filter(m=>m.status==='open').length;
+  const [showCompose,setShowCompose]=useState(false);
 
   return(
     <>
-      <div className="page-header"><div><div className="page-title">Messages</div><div className="page-sub">{openCount} awaiting reply · {messages.length} total</div></div></div>
+      <div className="page-header">
+        <div><div className="page-title">Messages</div><div className="page-sub">{openCount} awaiting reply · {messages.length} total</div></div>
+        <button className="btn btn-primary" onClick={()=>setShowCompose(true)}>+ New Message</button>
+      </div>
       <div className="content">
         <div style={{display:'flex',gap:8,marginBottom:14,flexWrap:'wrap'}}>
           {['all','open','replied'].map(f=>(
@@ -1757,6 +1787,7 @@ function HQMessages({onBadgeRefresh}){
         ))}
       </div>
       {selected&&<HQMessageDetail message={selected} onClose={()=>{setSelected(null);load();}}/>}
+      {showCompose&&<HQNewMessageModal onClose={()=>{setShowCompose(false);load();}}/>}
     </>
   );
 }
@@ -1887,6 +1918,88 @@ function HQMessageDetail({message,onClose}){
   );
 }
 
+function HQNewMessageModal({onClose}){
+  const [stores,setStores]=useState([]);
+  const [frId,setFrId]=useState('');
+  const [topic,setTopic]=useState('');
+  const [subject,setSubject]=useState('');
+  const [body,setBody]=useState('');
+  const [busy,setBusy]=useState(false);
+  const [msg,setMsg]=useState('');
+
+  useEffect(()=>{
+    sb.from('franchisees').select('id,name,store_name,email').eq('status','open').order('store_name').then(r=>setStores(r.data||[]));
+  },[]);
+
+  async function send(){
+    if(!frId){setMsg('Select a store.');return;}
+    if(!topic){setMsg('Choose a topic.');return;}
+    if(!subject.trim()||!body.trim()){setMsg('Subject and message are required.');return;}
+    setBusy(true);setMsg('');
+    const store=stores.find(s=>s.id===frId);
+    const storeName=store?.store_name||store?.name||'';
+    // HQ-initiated message: last sender is HQ so franchisee sees a badge
+    const{error}=await sb.from('ops_messages').insert([{
+      franchisee_id:frId,store_name:storeName,sender_name:'HQ',
+      topic,subject:subject.trim(),body:body.trim(),
+      status:'replied',is_read:true,last_sender_role:'hq',
+    }]);
+    if(error){setMsg('Error: '+error.message);setBusy(false);return;}
+    // Email franchisee
+    if(store?.email){
+      try{
+        await fetch(EMAIL_FN,{
+          method:'POST',headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({
+            to:store.email,
+            subject:`[${topic}] Message from HQ: ${subject.trim()}`,
+            html:`<div style="font-family:sans-serif;max-width:600px;margin:0 auto;background:#0E0E0E;color:#F0EDE8;padding:28px;border-radius:12px;"><div style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#14B8A6;margin-bottom:8px;">Franchise Ops · Message from HQ</div><h2 style="margin:0 0 4px;font-size:18px;">${subject.trim()}</h2><div style="font-size:13px;color:#8A8480;margin-bottom:16px;">Topic: <strong style="color:#14B8A6;">${topic}</strong></div><div style="background:#1A2A28;border:1px solid #243634;border-radius:10px;padding:16px;font-size:14px;line-height:1.6;white-space:pre-wrap;">${body.trim().replace(/</g,'&lt;')}</div><a href="https://uglyops.netlify.app" style="display:inline-block;margin-top:20px;background:#14B8A6;color:#04201C;padding:11px 22px;border-radius:8px;text-decoration:none;font-weight:700;font-size:14px;">Open Franchisee Portal →</a></div>`,
+          }),
+        });
+      }catch(e){/* best-effort */}
+    }
+    onClose();
+  }
+
+  return(
+    <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
+      <div className="modal">
+        <div className="modal-header">
+          <div className="modal-title">New Message to Franchisee</div>
+          <button className="close-btn" onClick={onClose}>×</button>
+        </div>
+        <div className="modal-body">
+          <div className="form-group">
+            <label>Store</label>
+            <select value={frId} onChange={e=>setFrId(e.target.value)} style={{width:'100%',background:'var(--panel2)',border:'1px solid var(--border2)',borderRadius:8,padding:'9px 12px',color:'var(--text)',fontFamily:'inherit',fontSize:14,outline:'none'}}>
+              <option value="">— Select store —</option>
+              {stores.map(s=><option key={s.id} value={s.id}>{s.store_name||s.name}</option>)}
+            </select>
+          </div>
+          <div className="form-group">
+            <label>Topic</label>
+            <div style={{display:'flex',flexWrap:'wrap',gap:8,marginTop:4}}>
+              {MSG_TOPICS.map(t=>(
+                <button key={t} onClick={()=>setTopic(t)} className="btn btn-sm"
+                  style={{background:topic===t?TOPIC_COLORS[t]:'var(--panel2)',color:topic===t?'#04201C':'var(--text)',border:`1px solid ${topic===t?TOPIC_COLORS[t]:'var(--border2)'}`,fontWeight:topic===t?700:500}}>
+                  {t}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="form-group"><label>Subject</label><input value={subject} onChange={e=>setSubject(e.target.value)} placeholder="Brief subject line"/></div>
+          <div className="form-group"><label>Message</label><textarea value={body} onChange={e=>setBody(e.target.value)} rows={5} placeholder="Write your message to the franchisee..." style={{resize:'vertical'}}/></div>
+          {msg&&<div style={{fontSize:13,color:'var(--red)',marginBottom:8}}>{msg}</div>}
+        </div>
+        <div className="modal-footer">
+          <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
+          <button className="btn btn-primary" onClick={send} disabled={busy||!frId||!topic||!subject.trim()||!body.trim()}>{busy?'Sending...':'Send Message →'}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function HQReview(){
   const [submitted,setSubmitted]=useState([]);
   const [loading,setLoading]=useState(true);
@@ -1966,12 +2079,28 @@ function AccountManager(){
     ]);
     const profiles=pRes.data||[];
     const allStores=sRes.data||[];
+    // Map store_name -> email so we can send password resets to franchisee accounts
+    const emailByStore={};
+    allStores.forEach(s=>{ if(s.store_name)emailByStore[s.store_name]=s.email; if(s.name)emailByStore[s.name]=emailByStore[s.name]||s.email; });
+    const profilesWithEmail=profiles.map(p=>({...p,_email:p.role==='franchisee'?emailByStore[p.store]:null}));
     const registeredNames=new Set(profiles.filter(p=>p.role==='franchisee').map(p=>p.store).filter(Boolean));
-    setAccounts(profiles);
+    setAccounts(profilesWithEmail);
     setUnregistered(allStores.filter(s=>!registeredNames.has(s.store_name||s.name)));
     setLoading(false);
   }
   useEffect(()=>{load();},[]);
+
+  async function sendPasswordReset(m){
+    const email=m._email;
+    if(!email){
+      window.alert('No email on file for this franchisee. Add their email in OS → Franchisees (Edit Info) first.');
+      return;
+    }
+    if(!window.confirm(`Send a password reset email to ${email}?\nThe franchisee will get a link to set a new password.`))return;
+    const{error}=await sb.auth.resetPasswordForEmail(email,{redirectTo:'https://uglyops.netlify.app'});
+    if(error){window.alert('Error: '+error.message);return;}
+    window.alert(`Password reset link sent to ${email}.`);
+  }
 
   async function approveStore(s){
     const email=emailInputs[s.id]||s.email;
@@ -1989,8 +2118,8 @@ function AccountManager(){
         setMsgs(m=>({...m,[s.id]:'Error: '+(data.error||'Unknown error')}));
       }else{
         setMsgs(m=>({...m,[s.id]:data.emailSent
-          ?`✓ Account created and login sent to ${email}`
-          :`✓ Account created. Email failed — temp password: ${data.tempPass}`
+          ?`✓ Account created and login email sent to ${email}\nTemp password: ${data.tempPass}  (also emailed — share securely)`
+          :`✓ Account created — but email did NOT send.\n${data.emailError?'Reason: '+data.emailError+'\n':''}Give the franchisee these login details manually:\nURL: https://uglyops.netlify.app\nEmail: ${email}\nTemp password: ${data.tempPass}`
         }));
         load();
       }
@@ -1998,6 +2127,14 @@ function AccountManager(){
       setMsgs(m=>({...m,[s.id]:'Error: '+e.message}));
     }
     setBusy(null);
+  }
+
+  async function removePending(s){
+    if(!window.confirm(`Remove ${s.store_name||s.name} from the activation list?\n\nThis deletes the franchisee record from Ops. (It does NOT affect the OS Franchisees section unless this store was pushed from there.)`))return;
+    setBusy(s.id);
+    await sb.from('franchisees').delete().eq('id',s.id);
+    setBusy(null);
+    load();
   }
 
   async function toggleActive(m){await sb.from('profiles').update({is_active:!m.is_active}).eq('id',m.id);load();}
@@ -2037,9 +2174,10 @@ function AccountManager(){
                   <button className="btn btn-primary btn-sm" disabled={busy===s.id||!(emailInputs[s.id]||s.email)} onClick={()=>approveStore(s)} style={{whiteSpace:'nowrap'}}>
                     {busy===s.id?'Creating...':'Approve & Send Login →'}
                   </button>
+                  <button className="btn btn-danger btn-sm" disabled={busy===s.id} onClick={()=>removePending(s)} style={{whiteSpace:'nowrap'}}>Delete</button>
                 </div>
                 {msgs[s.id]&&(
-                  <div style={{marginTop:8,fontSize:12,color:msgs[s.id].startsWith('✓')?'var(--green)':'var(--red)',padding:'6px 10px',background:msgs[s.id].startsWith('✓')?'rgba(95,184,122,.08)':'rgba(224,82,82,.08)',borderRadius:6}}>
+                  <div style={{marginTop:8,fontSize:12,color:msgs[s.id].startsWith('✓')?'var(--green)':'var(--red)',padding:'10px 12px',background:msgs[s.id].startsWith('✓')?'rgba(95,184,122,.08)':'rgba(224,82,82,.08)',borderRadius:6,lineHeight:1.6,whiteSpace:'pre-wrap'}}>
                     {msgs[s.id]}
                   </div>
                 )}
@@ -2077,6 +2215,7 @@ function AccountManager(){
                     <td><span className={`badge ${m.is_active!==false?'badge-green':'badge-red'}`}>{m.is_active!==false?'Active':'Inactive'}</span></td>
                     <td style={{display:'flex',gap:6}}>
                       <button className="btn btn-ghost btn-sm" onClick={()=>setEditMember(m)}>Edit</button>
+                      {m.role==='franchisee'&&<button className="btn btn-ghost btn-sm" onClick={()=>sendPasswordReset(m)}>Reset PW</button>}
                       <button className="btn btn-ghost btn-sm" onClick={()=>toggleActive(m)}>{m.is_active!==false?'Deactivate':'Reactivate'}</button>
                       <button className="btn btn-danger btn-sm" onClick={()=>deleteAccount(m)}>Delete</button>
                     </td>
