@@ -1018,7 +1018,7 @@ function AssignmentDetailModal({assignment,subtasks,onClose,onApprove,onReject})
 // ── BROADCAST TASK (New Task) ─────────────────────────────
 function BroadcastTask({onDone}){
   const [stores,setStores]=useState([]);
-  const [form,setForm]=useState({title:'',description:'',category:'operations',due_date:'',target:'all',require_hq_approval:false});
+  const [form,setForm]=useState({title:'',description:'',category:'operations',due_date:'',target:'',require_hq_approval:false});
   const [subtasks,setSubtasks]=useState([{title:'',proof_type:'photo',description:'',is_required:true}]);
   const [selectedStores,setSelectedStores]=useState([]);
   const [busy,setBusy]=useState(false);
@@ -1036,6 +1036,8 @@ function BroadcastTask({onDone}){
 
   async function broadcast(){
     if(!form.title||subtasks.some(s=>!s.title)){alert('Fill in task title and all sub-task names.');return;}
+    const hasTarget=(form.target==='all'&&stores.length>0)||(form.target==='select'&&selectedStores.length>0);
+    if(!hasTarget){alert('Please choose recipient stores before broadcasting.');return;}
     setBusy(true);
     // 1. Create task
     const{data:task}=await sb.from('ops_tasks').insert([{...form,target:form.target==='all'?'all':selectedStores.join(',')}]).select().single();
@@ -1061,7 +1063,7 @@ function BroadcastTask({onDone}){
     setBusy(false);onDone();
   }
 
-  const stepValid={1:!!form.title,2:subtasks.length>0&&subtasks.every(s=>s.title),3:form.target==='all'||selectedStores.length>0};
+  const stepValid={1:!!form.title,2:subtasks.length>0&&subtasks.every(s=>s.title),3:(form.target==='all'&&stores.length>0)||(form.target==='select'&&selectedStores.length>0)};
 
   return(
     <>
@@ -1184,13 +1186,19 @@ function BroadcastTask({onDone}){
               <div style={{fontSize:13,marginBottom:4}}><span style={{color:'var(--muted)'}}>Due:</span> {fmtDate(form.due_date)||'No date'}</div>
               <div style={{fontSize:13,marginBottom:4}}><span style={{color:'var(--muted)'}}>Sub-tasks:</span> {subtasks.length}</div>
               <div style={{fontSize:13,marginBottom:4}}><span style={{color:'var(--muted)'}}>HQ Approval:</span> {form.require_hq_approval?'Required':'Auto-approve'}</div>
-              <div style={{fontSize:13}}><span style={{color:'var(--muted)'}}>Sending to:</span> {form.target==='all'?`All ${stores.length} open stores`:`${selectedStores.length} selected stores`}</div>
+              <div style={{fontSize:13}}><span style={{color:'var(--muted)'}}>Sending to:</span> {form.target==='all'?`All ${stores.length} open stores`:form.target==='select'?`${selectedStores.length} selected stores`:<span style={{color:'var(--red)'}}>Not selected yet</span>}</div>
             </div>
+
+            {!stepValid[3]&&(
+              <div style={{background:'rgba(224,82,82,.08)',border:'1px solid rgba(224,82,82,.25)',borderRadius:8,padding:'10px 14px',marginBottom:16,fontSize:12,color:'var(--red)'}}>
+                ⚠ You must choose recipient stores above before broadcasting.
+              </div>
+            )}
 
             <div style={{display:'flex',gap:8}}>
               <button className="btn btn-ghost" onClick={()=>setStep(2)}>← Back</button>
               <button className="btn btn-primary" onClick={broadcast} disabled={busy||!stepValid[3]}>
-                {busy?'Broadcasting...':`Broadcast to ${form.target==='all'?stores.length:selectedStores.length} Store${(form.target==='all'?stores.length:selectedStores.length)!==1?'s':''} →`}
+                {busy?'Broadcasting...':!stepValid[3]?'Select stores first':`Broadcast to ${form.target==='all'?stores.length:selectedStores.length} Store${(form.target==='all'?stores.length:selectedStores.length)!==1?'s':''} →`}
               </button>
             </div>
           </div>
@@ -1736,6 +1744,8 @@ function Announcements(){
 
   async function sendAnnouncement(){
     if(!form.title||!form.body){setMsg('Title and body required.');return;}
+    const hasTarget=(form.target==='all'&&stores.length>0)||(form.target==='select'&&selectedStores.length>0);
+    if(!hasTarget){setMsg('Please choose recipient stores before sending.');return;}
     setBusy(true);setMsg('');
     // 0. Upload file if attached
     let attachment_url=null,attachment_name=null,attachment_type=null;
@@ -1863,10 +1873,15 @@ function Announcements(){
               )}
             </div>
             {msg&&<div style={{padding:12,background:msg.startsWith('✓')?'rgba(95,184,122,.1)':'rgba(224,82,82,.1)',border:`1px solid ${msg.startsWith('✓')?'rgba(95,184,122,.3)':'rgba(224,82,82,.3)'}`,borderRadius:8,fontSize:13,color:msg.startsWith('✓')?'var(--green)':'var(--red)',marginBottom:12}}>{msg}</div>}
+            {!((form.target==='all'&&stores.length>0)||(form.target==='select'&&selectedStores.length>0))&&form.title&&form.body&&(
+              <div style={{background:'rgba(224,82,82,.08)',border:'1px solid rgba(224,82,82,.25)',borderRadius:8,padding:'10px 14px',marginBottom:12,fontSize:12,color:'var(--red)'}}>
+                ⚠ Choose recipient stores above before sending.
+              </div>
+            )}
             <div style={{display:'flex',gap:8}}>
               <button className="btn btn-primary" onClick={sendAnnouncement} disabled={busy||!form.title||!form.body||
-                (form.target==='select'&&selectedStores.length===0)}>
-                {busy?'Sending...':form.target==='all'?`Send to All ${stores.length} Stores`:`Send to ${selectedStores.length} Store${selectedStores.length!==1?'s':''}`}
+                !((form.target==='all'&&stores.length>0)||(form.target==='select'&&selectedStores.length>0))}>
+                {busy?'Sending...':!((form.target==='all'&&stores.length>0)||(form.target==='select'&&selectedStores.length>0))?'Select stores first':form.target==='all'?`Send to All ${stores.length} Stores`:`Send to ${selectedStores.length} Store${selectedStores.length!==1?'s':''}`}
               </button>
               <button className="btn btn-ghost" onClick={()=>{setShowNew(false);setMsg('');}}>Cancel</button>
             </div>
