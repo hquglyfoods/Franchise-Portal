@@ -1386,18 +1386,15 @@ function AccountManager(){
   }
   useEffect(()=>{load();},[]);
 
-  async function createAccount(){
-    if(!form.name||!form.email){setMsg('Name and email are required.');return;}
-    setBusy(true);setMsg('');
+  async function approveStore(s){
+    const email=emailInputs[s.id]||s.email;
+    if(!email){setMsgs(m=>({...m,[s.id]:'Please enter an email address.'}));return;}
+    setBusy(s.id);
     const tempPass=Math.random().toString(36).slice(-8)+'Aa1!';
-    const{data:user,error}=await sb.auth.signUp({
-      email:form.email,
-      password:tempPass,
-      options:{data:{name:form.name}}
-    });
-    if(error){setMsg('Error: '+error.message);setBusy(false);return;}
+    const storeName=s.store_name||s.name||'';
+    const{data:user,error}=await sb.auth.signUp({email,password:tempPass,options:{data:{name:storeName}}});
+    if(error){setMsgs(m=>({...m,[s.id]:'Error: '+error.message}));setBusy(null);return;}
     if(user?.user){
-      const storeName=s.store_name||s.name||'';
       await sb.from('profiles').upsert([{
         id:user.user.id,
         full_name:storeName,
@@ -1406,10 +1403,7 @@ function AccountManager(){
         store:storeName,
         is_active:true,
       }],{onConflict:'id'});
-
-      // Send welcome email
-      const emailHtml=`<div style="font-family:sans-serif;max-width:600px;margin:0 auto;background:#0E0E0E;color:#F0EDE8;padding:32px;border-radius:12px;"><div style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#CC9C3A;margin-bottom:8px;">Ugly Donuts & Corn Dogs</div><h1 style="font-size:22px;margin:0 0 8px;">Welcome to Franchise Ops</h1><p style="color:#8A8480;font-size:14px;margin:0 0 24px;">Your Franchise Ops account for <strong style="color:#F0EDE8;">${storeName}</strong> has been activated.</p><div style="background:#1E1E1E;border:1px solid #2E2E2E;border-radius:10px;padding:20px;margin-bottom:20px;"><div style="margin-bottom:14px;"><div style="font-size:11px;color:#8A8480;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;">Login URL</div><div style="font-size:15px;font-weight:700;color:#F26419;">https://uglyops.netlify.app</div></div><div style="margin-bottom:14px;"><div style="font-size:11px;color:#8A8480;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;">Email</div><div style="font-size:15px;font-weight:700;">${email}</div></div><div><div style="font-size:11px;color:#8A8480;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;">Temporary Password</div><div style="font-size:22px;font-weight:700;font-family:monospace;letter-spacing:.1em;color:#CC9C3A;">${tempPass}</div></div></div><div style="background:rgba(204,156,58,.08);border:1px solid rgba(204,156,58,.3);border-radius:8px;padding:12px;margin-bottom:20px;"><p style="color:#CC9C3A;font-size:13px;margin:0;">⚠ Please change your password after first login in the Settings menu.</p></div><a href="https://uglyops.netlify.app" style="display:inline-block;background:#F26419;color:#000;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:700;font-size:14px;">Login to Franchise Ops →</a><p style="color:#5A5654;font-size:11px;margin-top:24px;">Ugly Donuts & Corn Dogs Franchising LLC · Belleville, NJ</p></div>`;
-
+      const emailHtml=`<div style="font-family:sans-serif;max-width:600px;margin:0 auto;background:#0E0E0E;color:#F0EDE8;padding:32px;border-radius:12px;"><div style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#CC9C3A;margin-bottom:8px;">Ugly Donuts & Corn Dogs</div><h1 style="font-size:22px;margin:0 0 8px;">Welcome to Franchise Ops</h1><p style="color:#8A8480;font-size:14px;margin:0 0 24px;">Your Franchise Ops account for <strong style="color:#F0EDE8;">${storeName}</strong> has been activated.</p><div style="background:#1E1E1E;border:1px solid #2E2E2E;border-radius:10px;padding:20px;margin-bottom:20px;"><div style="margin-bottom:14px;"><div style="font-size:11px;color:#8A8480;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;">Login URL</div><div style="font-size:15px;font-weight:700;color:#F26419;">https://uglyops.netlify.app</div></div><div style="margin-bottom:14px;"><div style="font-size:11px;color:#8A8480;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;">Email</div><div style="font-size:15px;font-weight:700;">${email}</div></div><div><div style="font-size:11px;color:#8A8480;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;">Temporary Password</div><div style="font-size:22px;font-weight:700;font-family:monospace;letter-spacing:.1em;color:#CC9C3A;">${tempPass}</div></div></div><div style="background:rgba(204,156,58,.08);border:1px solid rgba(204,156,58,.3);border-radius:8px;padding:12px;margin-bottom:20px;"><p style="color:#CC9C3A;font-size:13px;margin:0;">⚠ Please change your password after first login in the Settings menu.</p></div><a href="https://uglyops.netlify.app" style="display:inline-block;background:#F26419;color:#000;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:700;font-size:14px;">Login to Franchise Ops →</a><p style="color:#5A5654;font-size:11px;margin-top:24px;">Ugly Donuts & Corn Dogs Franchising LLC</p></div>`;
       const emailSent=await sendEmail(email,'Your Ugly Donuts Franchise Ops Account',emailHtml);
       setMsgs(m=>({...m,[s.id]:emailSent
         ?`✓ Account created and login sent to ${email}`
