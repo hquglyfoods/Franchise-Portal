@@ -816,8 +816,12 @@ function TaskDetailModal({task,onClose}){
             </div>
           )}
         </div>
-        <div className="modal-footer"><button className="btn btn-ghost" onClick={onClose}>Close</button></div>
+        <div className="modal-footer">
+          <button className="btn btn-ghost btn-sm" onClick={()=>setEditStore(true)} style={{marginRight:'auto'}}>✏ Edit Store Info</button>
+          <button className="btn btn-ghost" onClick={onClose}>Close</button>
+        </div>
       </div>
+      {editStore&&<EditStoreModal store={store} onClose={()=>{setEditStore(false);onClose();}}/>}
       {selected&&<AssignmentDetailModal assignment={selected} subtasks={subtasks} onClose={()=>{setSelected(null);load();}} onApprove={()=>{approve(selected.id);setSelected(null);}} onReject={()=>{reject(selected.id);setSelected(null);}}/>}
     </div>
   );
@@ -1270,6 +1274,7 @@ function StoreList({setView}){
 
 function StoreDetailModal({store,tasks,assignments,onClose}){
   const myAssigns=assignments.filter(a=>a.franchisee_id===store.id);
+  const [editStore,setEditStore]=useState(false);
   const [selected,setSelected]=useState(null);
   const [subtasks,setSubtasks]=useState([]);
 
@@ -1517,13 +1522,23 @@ function EditAccountModal({member,stores,onClose}){
     store:member.store||'',
     role:member.role||'franchisee',
     is_active:member.is_active!==false,
+    email:'',
   });
   const [busy,setBusy]=useState(false);
   const [msg,setMsg]=useState('');
   const set=(k,v)=>setForm(f=>({...f,[k]:v}));
 
+  // Load franchisee email if this is a franchisee account
+  useEffect(()=>{
+    if(member.role==='franchisee'&&member.store){
+      sb.from('franchisees').select('email').or(`store_name.eq.${member.store},name.eq.${member.store}`).limit(1).single()
+        .then(({data})=>{if(data?.email)set('email',data.email);});
+    }
+  },[]);
+
   async function save(){
     setBusy(true);
+    // Update profile
     const{error}=await sb.from('profiles').update({
       full_name:form.name,
       name:form.name,
@@ -1531,8 +1546,13 @@ function EditAccountModal({member,stores,onClose}){
       role:form.role,
       is_active:form.is_active,
     }).eq('id',member.id);
-    if(error){setMsg('Error: '+error.message);}
-    else{setMsg('Saved!');setTimeout(()=>onClose(),800);}
+    if(error){setMsg('Error: '+error.message);setBusy(false);return;}
+    // Update franchisees table email if franchisee
+    if(member.role==='franchisee'&&form.store&&form.email){
+      await sb.from('franchisees').update({email:form.email})
+        .or(`store_name.eq.${form.store},name.eq.${form.store}`);
+    }
+    setMsg('Saved!');setTimeout(()=>onClose(),800);
     setBusy(false);
   }
 
@@ -1545,6 +1565,7 @@ function EditAccountModal({member,stores,onClose}){
         </div>
         <div className="modal-body">
           <div className="form-group"><label>Full Name</label><input value={form.name} onChange={e=>set('name',e.target.value)}/></div>
+          {member.role==='franchisee'&&<div className="form-group"><label>Franchisee Email (for notifications)</label><input type="email" value={form.email} onChange={e=>set('email',e.target.value)} placeholder="franchisee@email.com"/></div>}
           <div className="form-group">
             <label>Linked Store</label>
             <select value={form.store} onChange={e=>set('store',e.target.value)} style={{background:'var(--panel2)',border:'1px solid var(--border2)',borderRadius:8,padding:'9px 12px',color:'var(--text)',fontFamily:'inherit',fontSize:13,outline:'none',width:'100%'}}>
@@ -1568,8 +1589,9 @@ function EditAccountModal({member,stores,onClose}){
               </select>
             </div>
           </div>
-          <div style={{background:'rgba(204,156,58,.08)',border:'1px solid rgba(204,156,58,.2)',borderRadius:8,padding:12,fontSize:13,color:'var(--muted)'}}>
-            To reset password or change email: Supabase Dashboard → Authentication → Users → find user → edit
+          <div style={{background:'rgba(91,143,212,.08)',border:'1px solid rgba(91,143,212,.2)',borderRadius:8,padding:12,fontSize:13,color:'var(--muted)'}}>
+            <div style={{fontWeight:600,color:'var(--blue)',marginBottom:4,fontSize:12}}>Email / Password changes</div>
+            To change email or reset password: Supabase Dashboard → Authentication → Users → find user → edit
           </div>
           {msg&&<div style={{marginTop:10,fontSize:13,color:msg.startsWith('Error')?'var(--red)':'var(--green)'}}>{msg}</div>}
         </div>
@@ -1871,6 +1893,70 @@ function AnnouncementCard({ann,stores,catColor,catLabel,onRefresh}){
           </div>
         </>
       )}
+    </div>
+  );
+}
+
+
+// ── EDIT STORE MODAL (OPS) ────────────────────────────────
+function EditStoreModal({store, onClose}){
+  const [form,setForm]=useState({
+    name:store.name||'',
+    store_name:store.store_name||'',
+    email:store.email||'',
+    phone:store.phone||'',
+    territory:store.territory||'',
+    entity_name:store.entity_name||'',
+  });
+  const [busy,setBusy]=useState(false);
+  const [msg,setMsg]=useState('');
+  const set=(k,v)=>setForm(f=>({...f,[k]:v}));
+
+  async function save(){
+    setBusy(true);
+    const{error}=await sb.from('franchisees').update({
+      name:form.name,
+      store_name:form.store_name,
+      email:form.email,
+      phone:form.phone,
+      territory:form.territory,
+      entity_name:form.entity_name,
+      updated_at:new Date().toISOString(),
+    }).eq('id',store.id);
+    if(error){setMsg('Error: '+error.message);setBusy(false);return;}
+    setMsg('Saved!');
+    setTimeout(()=>onClose(),600);
+    setBusy(false);
+  }
+
+  return(
+    <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
+      <div className="modal">
+        <div className="modal-header">
+          <div className="modal-title">Edit Store Info</div>
+          <button className="close-btn" onClick={onClose}>×</button>
+        </div>
+        <div className="modal-body">
+          <div style={{fontSize:11,fontWeight:700,color:'var(--muted)',textTransform:'uppercase',letterSpacing:'.06em',marginBottom:10}}>Store</div>
+          <div className="form-row">
+            <div className="form-group"><label>Store Name</label><input value={form.store_name} onChange={e=>set('store_name',e.target.value)}/></div>
+            <div className="form-group"><label>Territory</label><input value={form.territory} onChange={e=>set('territory',e.target.value)}/></div>
+          </div>
+          <div className="form-group"><label>Legal Entity Name</label><input value={form.entity_name} onChange={e=>set('entity_name',e.target.value)}/></div>
+          <div style={{height:1,background:'var(--border)',margin:'16px 0'}}/>
+          <div style={{fontSize:11,fontWeight:700,color:'var(--muted)',textTransform:'uppercase',letterSpacing:'.06em',marginBottom:10}}>Franchisee Contact</div>
+          <div className="form-group"><label>Full Name</label><input value={form.name} onChange={e=>set('name',e.target.value)}/></div>
+          <div className="form-row">
+            <div className="form-group"><label>Email</label><input type="email" value={form.email} onChange={e=>set('email',e.target.value)} placeholder="franchisee@email.com"/></div>
+            <div className="form-group"><label>Phone</label><input value={form.phone} onChange={e=>set('phone',e.target.value)}/></div>
+          </div>
+          {msg&&<div style={{fontSize:13,color:msg==='Saved!'?'var(--green)':'var(--red)',marginTop:4}}>{msg}</div>}
+        </div>
+        <div className="modal-footer">
+          <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
+          <button className="btn btn-primary" onClick={save} disabled={busy}>{busy?'Saving...':'Save Changes'}</button>
+        </div>
+      </div>
     </div>
   );
 }
