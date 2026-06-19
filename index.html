@@ -262,6 +262,25 @@ const STATUS_LABELS = {
 function catStyle(k){const c=CATEGORIES.find(x=>x.key===k);return c?{background:c.color+'22',color:c.color}:{background:'rgba(255,255,255,.05)',color:'var(--muted)'};}
 function catLabel(k){return CATEGORIES.find(x=>x.key===k)?.label||k;}
 function fmtDate(ts){if(!ts)return'';return new Date(ts).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});}
+
+// Shared resolver: get a franchisee record for a given portal profile.
+// Tries profile.franchisee_id first, then falls back to matching store name.
+// Returns the franchisee object (or null). Used by all portal screens for consistency.
+async function resolveFranchisee(profile){
+  if(!profile)return null;
+  if(profile.franchisee_id){
+    const{data}=await sb.from('franchisees').select('id,name,store_name,email').eq('id',profile.franchisee_id).maybeSingle();
+    if(data)return data;
+  }
+  const sn=(profile.store||profile.full_name||profile.name||'').trim().toLowerCase();
+  if(!sn)return null;
+  const{data:allFr}=await sb.from('franchisees').select('id,name,store_name,email').in('status',['open','soft_open']);
+  return (allFr||[]).find(f=>(f.store_name||'').toLowerCase()===sn||(f.name||'').toLowerCase()===sn)||null;
+}
+async function resolveFranchiseeId(profile){
+  const fr=await resolveFranchisee(profile);
+  return fr?fr.id:null;
+}
 function daysUntil(d){if(!d)return null;return Math.ceil((new Date(d)-new Date())/(1000*60*60*24));}
 
 // ── APP ───────────────────────────────────────────────────
@@ -275,16 +294,22 @@ function App(){
     sb.auth.getSession().then(async({data})=>{
       setSession(data.session);
       if(data.session){
-        const{data:p}=await sb.from('profiles').select('*').eq('id',data.session.user.id).single();
-        setProfile(p||{role:'hq'});
+        const{data:p,error}=await sb.from('profiles').select('*').eq('id',data.session.user.id).maybeSingle();
+        // Only default to HQ if we successfully read and the row truly has no role.
+        // If the read failed, keep profile null so we don't accidentally grant HQ access.
+        if(error){setProfile({role:'unknown',_loadError:true});}
+        else if(p){setProfile(p);}
+        else{setProfile({role:'hq'});} // no profile row = legacy HQ user
       }
       setLoading(false);
     });
     const{data:{subscription}}=sb.auth.onAuthStateChange(async(_,s)=>{
       setSession(s);
       if(s){
-        const{data:p}=await sb.from('profiles').select('*').eq('id',s.user.id).single();
-        setProfile(p||{role:'hq'});
+        const{data:p,error}=await sb.from('profiles').select('*').eq('id',s.user.id).maybeSingle();
+        if(error){setProfile({role:'unknown',_loadError:true});}
+        else if(p){setProfile(p);}
+        else{setProfile({role:'hq'});}
       }else{
         setProfile(null);
       }
@@ -294,6 +319,23 @@ function App(){
 
   if(loading)return<div className="loading">Loading...</div>;
   if(!session)return<AuthScreen/>;
+  // Profile failed to load — don't guess the role. Ask them to retry rather than
+  // risk routing a franchisee into HQ screens.
+  if(profile?._loadError){
+    return(
+      <div className="auth-wrap">
+        <div className="auth-card" style={{textAlign:'center'}}>
+          <div className="auth-logo">Ugly Donuts</div>
+          <div className="auth-app">Franchise Ops</div>
+          <div style={{color:'var(--red)',fontSize:14,margin:'20px 0',lineHeight:1.6}}>We couldn't load your account profile. This is usually a temporary connection issue.</div>
+          <button className="btn-gold" onClick={()=>window.location.reload()}>Retry</button>
+          <div style={{marginTop:16}}>
+            <button onClick={()=>sb.auth.signOut()} style={{background:'none',border:'none',color:'var(--muted)',cursor:'pointer',fontSize:12,fontFamily:'inherit',textDecoration:'underline'}}>Sign out</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
   // Route by role
   if(profile?.role==='franchisee')return<FranchiseePortal session={session} profile={profile}/>;
   return<MainApp view={view} setView={setView} session={session}/>;
@@ -360,7 +402,7 @@ function MainApp({view,setView,session}){
     // Stores open but without an Ops account yet (need HQ approval)
     const[pRes,sRes]=await Promise.all([
       sb.from('profiles').select('store').eq('role','franchisee'),
-      sb.from('franchisees').select('store_name,name').eq('status','open'),
+      sb.from('franchisees').select('store_name,name').in('status',['open','soft_open']),
     ]);
     const registered=new Set((pRes.data||[]).map(p=>p.store).filter(Boolean));
     const needApproval=(sRes.data||[]).filter(s=>!registered.has(s.store_name||s.name)).length;
@@ -431,7 +473,7 @@ function Dashboard({setView}){
   useEffect(()=>{
     async function load(){
       const[storesRes,tasksRes,assignRes]=await Promise.all([
-        sb.from('franchisees').select('id,name,territory').eq('status','open'),
+        sb.from('franchisees').select('id,name,territory').in('status',['open','soft_open']),
         sb.from('ops_tasks').select('*').eq('status','active').order('created_at',{ascending:false}),
         sb.from('ops_assignments').select('ops_task_id,franchisee_id,status'),
       ]);
@@ -476,7 +518,7 @@ function Dashboard({setView}){
     if(!popup){setPopupData([]);return;}
     async function loadPopup(){
       if(popup==='stores'){
-        const{data}=await sb.from('franchisees').select('*').eq('status','open').order('name');
+        const{data}=await sb.from('franchisees').select('*').in('status',['open','soft_open']).order('name');
         setPopupData(data||[]);
       }else if(popup==='tasks'){
         const{data}=await sb.from('ops_tasks').select('*').eq('status','active').order('created_at',{ascending:false});
@@ -1107,7 +1149,7 @@ function BroadcastTask({onDone}){
   const set=(k,v)=>setForm(f=>({...f,[k]:v}));
 
   useEffect(()=>{
-    sb.from('franchisees').select('id,name,store_name,territory,email').eq('status','open').order('name').then(r=>setStores(r.data||[]));
+    sb.from('franchisees').select('id,name,store_name,territory,email').in('status',['open','soft_open']).order('name').then(r=>setStores(r.data||[]));
   },[]);
 
   function addSubtask(){setSubtasks(s=>[...s,{title:'',proof_type:'photo',description:'',is_required:true}]);}
@@ -1303,7 +1345,7 @@ function StoreList({setView}){
     async function load(){
       setLoading(true);
       const[sRes,tRes,aRes,pRes]=await Promise.all([
-        sb.from('franchisees').select('*').eq('status','open').order('store_name'),
+        sb.from('franchisees').select('*').in('status',['open','soft_open']).order('store_name'),
         sb.from('ops_tasks').select('id,title,category').eq('status','active'),
         sb.from('ops_assignments').select('*'),
         sb.from('profiles').select('store,full_name,name').eq('role','franchisee'),
@@ -1486,7 +1528,7 @@ function HQWarnings(){
   async function load(){
     setLoading(true);
     const[sRes,wRes]=await Promise.all([
-      sb.from('franchisees').select('id,name,store_name,territory,email').eq('status','open').order('store_name'),
+      sb.from('franchisees').select('id,name,store_name,territory,email').in('status',['open','soft_open']).order('store_name'),
       sb.from('ops_warnings').select('*').order('issued_at',{ascending:false}),
     ]);
     setStores(sRes.data||[]);
@@ -1937,7 +1979,7 @@ function HQNewMessageModal({onClose}){
   const [msg,setMsg]=useState('');
 
   useEffect(()=>{
-    sb.from('franchisees').select('id,name,store_name,email').eq('status','open').order('store_name').then(r=>setStores(r.data||[]));
+    sb.from('franchisees').select('id,name,store_name,email').in('status',['open','soft_open']).order('store_name').then(r=>setStores(r.data||[]));
   },[]);
 
   async function send(){
@@ -2084,7 +2126,7 @@ function AccountManager({onBadgeRefresh}){
     setLoading(true);
     const[pRes,sRes]=await Promise.all([
       sb.from('profiles').select('id,full_name,name,title,role,store,is_active,created_at').order('full_name'),
-      sb.from('franchisees').select('id,name,store_name,territory,email').eq('status','open').order('store_name'),
+      sb.from('franchisees').select('id,name,store_name,territory,email').in('status',['open','soft_open']).order('store_name'),
     ]);
     const profiles=pRes.data||[];
     const allStores=sRes.data||[];
@@ -2378,7 +2420,7 @@ function Announcements(){
     setLoading(true);
     const[aRes,sRes]=await Promise.all([
       sb.from('ops_announcements').select('*').order('created_at',{ascending:false}),
-      sb.from('franchisees').select('id,name,store_name,territory,email').eq('status','open').order('name'),
+      sb.from('franchisees').select('id,name,store_name,territory,email').in('status',['open','soft_open']).order('name'),
     ]);
     setAnnouncements(aRes.data||[]);
     setStores(sRes.data||[]);
@@ -2759,14 +2801,7 @@ function FranchiseePortal({session, profile}){
   const storeName=profile?.store||profile?.full_name||profile?.name||'My Store';
 
   const resolveFrId=useCallback(async()=>{
-    let frId=profile?.franchisee_id;
-    if(!frId){
-      const sn=(profile?.store||profile?.full_name||'').trim();
-      const{data:allFr}=await sb.from('franchisees').select('id,store_name,name').eq('status','open');
-      const fr=(allFr||[]).find(f=>(f.store_name||'').toLowerCase()===sn.toLowerCase()||(f.name||'').toLowerCase()===sn.toLowerCase());
-      frId=fr?.id;
-    }
-    return frId;
+    return await resolveFranchiseeId(profile);
   },[profile]);
 
   const refreshBadges=useCallback(async()=>{
@@ -2855,13 +2890,7 @@ function ContactHQ({profile,storeName,onSeen}){
 
   async function loadHistory(){
     setLoading(true);
-    let frId=profile?.franchisee_id;
-    if(!frId){
-      const sn=(profile?.store||profile?.full_name||'').trim();
-      const{data:allFr}=await sb.from('franchisees').select('id,store_name,name').eq('status','open');
-      const fr=(allFr||[]).find(f=>(f.store_name||'').toLowerCase()===sn.toLowerCase()||(f.name||'').toLowerCase()===sn.toLowerCase());
-      frId=fr?.id;
-    }
+    const frId=await resolveFranchiseeId(profile);
     if(frId){
       const{data}=await sb.from('ops_messages').select('*').eq('franchisee_id',frId).order('created_at',{ascending:false});
       setHistory(data||[]);
@@ -2875,13 +2904,7 @@ function ContactHQ({profile,storeName,onSeen}){
     if(!subject.trim()||!body.trim()){setMsg('Subject and message are required.');return;}
     setBusy(true);setMsg('');
     // Resolve franchisee_id
-    let frId=profile?.franchisee_id;
-    if(!frId){
-      const sn=(profile?.store||profile?.full_name||'').trim();
-      const{data:allFr}=await sb.from('franchisees').select('id,store_name,name').eq('status','open');
-      const fr=(allFr||[]).find(f=>(f.store_name||'').toLowerCase()===sn.toLowerCase()||(f.name||'').toLowerCase()===sn.toLowerCase());
-      frId=fr?.id;
-    }
+    const frId=await resolveFranchiseeId(profile);
     const{error}=await sb.from('ops_messages').insert([{
       franchisee_id:frId||null,
       store_name:storeName,
@@ -3042,13 +3065,7 @@ function FranchiseeWarnings({profile,storeName}){
 
   async function load(){
     setLoading(true);
-    let frId=profile?.franchisee_id;
-    if(!frId){
-      const sn=(profile?.store||profile?.full_name||'').trim();
-      const{data:allFr}=await sb.from('franchisees').select('id,store_name,name').eq('status','open');
-      const fr=(allFr||[]).find(f=>(f.store_name||'').toLowerCase()===sn.toLowerCase()||(f.name||'').toLowerCase()===sn.toLowerCase());
-      frId=fr?.id;
-    }
+    const frId=await resolveFranchiseeId(profile);
     if(frId){
       const{data}=await sb.from('ops_warnings').select('*').eq('franchisee_id',frId).order('issued_at',{ascending:false});
       setWarnings(data||[]);
@@ -3122,27 +3139,13 @@ function FranchiseeTasks({profile,onUpdate}){
   const [selected,setSelected]=useState(null);
   const [subtasksMap,setSubtasksMap]=useState({});
   const [completionsMap,setCompletionsMap]=useState({});
+  const [notLinked,setNotLinked]=useState(false);
 
   async function load(){
     setLoading(true);
-    // Use franchisee_id directly from profile (most reliable)
-    let fr=null;
-    if(profile?.franchisee_id){
-      const{data:frDirect}=await sb.from('franchisees').select('id,name,store_name').eq('id',profile.franchisee_id).maybeSingle();
-      fr=frDirect;
-    }
-    // Fallback: match by store name
-    if(!fr){
-      const storeName=(profile?.store||profile?.full_name||profile?.name||'').trim();
-      if(storeName){
-        const{data:allFr}=await sb.from('franchisees').select('id,name,store_name').eq('status','open');
-        if(allFr){
-          fr=allFr.find(f=>(f.store_name||'').toLowerCase()===storeName.toLowerCase())
-            ||allFr.find(f=>(f.name||'').toLowerCase()===storeName.toLowerCase());
-        }
-      }
-    }
-    if(!fr){setLoading(false);return;}
+    const fr=await resolveFranchisee(profile);
+    if(!fr){setNotLinked(true);setLoading(false);return;}
+    setNotLinked(false);
 
     const{data:assigns}=await sb.from('ops_assignments')
       .select('*,ops_tasks(title,description,category,due_date,require_hq_approval,status)')
@@ -3176,7 +3179,9 @@ function FranchiseeTasks({profile,onUpdate}){
         <div><div className="page-title">My Tasks</div><div className="page-sub">Tasks assigned by HQ</div></div>
       </div>
       <div className="content">
-        {loading?<div className="loading">Loading...</div>:assignments.length===0?(
+        {loading?<div className="loading">Loading...</div>:notLinked?(
+          <div className="empty"><div className="empty-icon">⚠</div><div className="empty-title">Account not linked to a store</div><div style={{fontSize:13,color:'var(--muted)',lineHeight:1.6,maxWidth:420,margin:'0 auto'}}>We couldn't connect your login to a store record, so tasks can't be shown. This is not the same as having no tasks. Please contact HQ to fix your account link.</div></div>
+        ):assignments.length===0?(
           <div className="empty"><div className="empty-icon">▤</div><div className="empty-title">No tasks yet</div><div style={{fontSize:13,color:'var(--muted)'}}>HQ will assign tasks here</div></div>
         ):(
           assignments.map(a=>(
@@ -3227,17 +3232,26 @@ function FranchiseeTaskModal({assignment,subtasks,completions,onClose}){
     const existing=comps.find(c=>c.ops_subtask_id===st.id);
     if(existing?.completed)return; // can't uncheck
     setBusy(true);
+    let err=null;
     if(existing){
-      await sb.from('ops_completions').update({completed:true,completed_at:new Date().toISOString()}).eq('id',existing.id);
+      const r=await sb.from('ops_completions').update({completed:true,completed_at:new Date().toISOString()}).eq('id',existing.id);
+      err=r.error;
     }else{
-      await sb.from('ops_completions').insert([{ops_assignment_id:assignment.id,ops_subtask_id:st.id,completed:true,completed_at:new Date().toISOString()}]);
+      const r=await sb.from('ops_completions').insert([{ops_assignment_id:assignment.id,ops_subtask_id:st.id,completed:true,completed_at:new Date().toISOString()}]);
+      err=r.error;
     }
+    if(err){alert('Could not mark complete: '+err.message+'\nPlease try again.');setBusy(false);return;}
     const{data}=await sb.from('ops_completions').select('*').eq('ops_assignment_id',assignment.id);
     setComps(data||[]);
     setBusy(false);
   }
 
   async function uploadProof(st, file){
+    // Guard against very large phone photos that stall or fail
+    if(file.size>10*1024*1024){
+      alert('That image is '+(file.size/1024/1024).toFixed(1)+'MB. Please use a photo under 10MB (most phones let you choose a smaller size).');
+      return;
+    }
     setUploadingId(st.id);
     const path=`proofs/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9._-]/g,'_')}`;
     const{error}=await sb.storage.from('ops-proofs').upload(path,file,{contentType:file.type});
@@ -3245,11 +3259,15 @@ function FranchiseeTaskModal({assignment,subtasks,completions,onClose}){
     const{data:urlData}=sb.storage.from('ops-proofs').getPublicUrl(path);
     // Save completion with proof
     const existing=comps.find(c=>c.ops_subtask_id===st.id);
+    let saveErr=null;
     if(existing){
-      await sb.from('ops_completions').update({completed:true,completed_at:new Date().toISOString(),proof_image_url:urlData.publicUrl,proof_text:textInputs[st.id]||null}).eq('id',existing.id);
+      const r=await sb.from('ops_completions').update({completed:true,completed_at:new Date().toISOString(),proof_image_url:urlData.publicUrl,proof_text:textInputs[st.id]||null}).eq('id',existing.id);
+      saveErr=r.error;
     }else{
-      await sb.from('ops_completions').insert([{ops_assignment_id:assignment.id,ops_subtask_id:st.id,completed:true,completed_at:new Date().toISOString(),proof_image_url:urlData.publicUrl,proof_text:textInputs[st.id]||null}]);
+      const r=await sb.from('ops_completions').insert([{ops_assignment_id:assignment.id,ops_subtask_id:st.id,completed:true,completed_at:new Date().toISOString(),proof_image_url:urlData.publicUrl,proof_text:textInputs[st.id]||null}]);
+      saveErr=r.error;
     }
+    if(saveErr){alert('Photo uploaded but saving failed: '+saveErr.message+'\nPlease try again.');setUploadingId(null);return;}
     const{data}=await sb.from('ops_completions').select('*').eq('ops_assignment_id',assignment.id);
     setComps(data||[]);
     setUploadingId(null);
@@ -3260,11 +3278,15 @@ function FranchiseeTaskModal({assignment,subtasks,completions,onClose}){
     if(!text?.trim())return;
     setBusy(true);
     const existing=comps.find(c=>c.ops_subtask_id===st.id);
+    let err=null;
     if(existing){
-      await sb.from('ops_completions').update({completed:true,completed_at:new Date().toISOString(),proof_text:text}).eq('id',existing.id);
+      const r=await sb.from('ops_completions').update({completed:true,completed_at:new Date().toISOString(),proof_text:text}).eq('id',existing.id);
+      err=r.error;
     }else{
-      await sb.from('ops_completions').insert([{ops_assignment_id:assignment.id,ops_subtask_id:st.id,completed:true,completed_at:new Date().toISOString(),proof_text:text}]);
+      const r=await sb.from('ops_completions').insert([{ops_assignment_id:assignment.id,ops_subtask_id:st.id,completed:true,completed_at:new Date().toISOString(),proof_text:text}]);
+      err=r.error;
     }
+    if(err){alert('Could not save: '+err.message+'\nPlease try again.');setBusy(false);return;}
     const{data}=await sb.from('ops_completions').select('*').eq('ops_assignment_id',assignment.id);
     setComps(data||[]);
     setBusy(false);
@@ -3273,8 +3295,10 @@ function FranchiseeTaskModal({assignment,subtasks,completions,onClose}){
   async function submitToHQ(){
     if(!window.confirm('Submit all completed tasks to HQ for review?'))return;
     setBusy(true);
-    await sb.from('ops_assignments').update({status:assignment.ops_tasks?.require_hq_approval?'submitted':'approved',updated_at:new Date().toISOString()}).eq('id',assignment.id);
-    setBusy(false);onClose();
+    const{error}=await sb.from('ops_assignments').update({status:assignment.ops_tasks?.require_hq_approval?'submitted':'approved',updated_at:new Date().toISOString()}).eq('id',assignment.id);
+    setBusy(false);
+    if(error){alert('Submit failed: '+error.message+'\nPlease try again.');return;}
+    onClose();
   }
 
   const allRequired=subtasks.filter(s=>s.is_required);
@@ -3388,22 +3412,7 @@ function FranchiseeAnnouncements({profile,onUpdate}){
   useEffect(()=>{
     async function load(){
       setLoading(true);
-      let fr=null;
-      if(profile?.franchisee_id){
-        const{data:frDirect}=await sb.from('franchisees').select('id').eq('id',profile.franchisee_id).maybeSingle();
-        fr=frDirect;
-      }
-      if(!fr){
-        const storeName=(profile?.store||profile?.full_name||profile?.name||'').trim();
-        if(storeName){
-          const{data:allFr2}=await sb.from('franchisees').select('id,name,store_name').eq('status','open');
-          if(allFr2){
-            fr=allFr2.find(f=>(f.store_name||'').toLowerCase()===storeName.toLowerCase())
-              ||allFr2.find(f=>(f.name||'').toLowerCase()===storeName.toLowerCase());
-          }
-        }
-      }
-      const frId=fr?.id;
+      const frId=await resolveFranchiseeId(profile);
       setFranchiseeId(frId);
 
       const[aRes,rRes]=await Promise.all([
@@ -3457,6 +3466,11 @@ function FranchiseeAnnouncements({profile,onUpdate}){
         <div><div className="page-title">Announcements</div><div className="page-sub">Messages from HQ</div></div>
       </div>
       <div className="content">
+        {!loading&&!franchiseeId&&(
+          <div style={{background:'rgba(224,82,82,.1)',border:'1px solid rgba(224,82,82,.3)',borderRadius:10,padding:14,marginBottom:16,fontSize:13,color:'var(--red)',lineHeight:1.5}}>
+            ⚠ Your login isn't linked to a store, so you can't confirm receipts. Please contact HQ to fix your account.
+          </div>
+        )}
         {loading?<div className="loading">Loading...</div>:announcements.length===0?(
           <div className="empty"><div className="empty-icon">◈</div><div className="empty-title">No announcements</div></div>
         ):(
