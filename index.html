@@ -195,6 +195,7 @@ const sb = supabase.createClient(SUPA_URL, SUPA_KEY);
 const EMAIL_FN = '/.netlify/functions/send-email';
 const AI_FN = '/.netlify/functions/chat';
 const CREATE_ACCOUNT_FN = '/.netlify/functions/create-account';
+const RESET_PW_FN = '/.netlify/functions/reset-password';
 
 async function sendEmail(to, subject, html){
   try{
@@ -2174,6 +2175,25 @@ function AccountManager({onBadgeRefresh}){
   const [msgs,setMsgs]=useState({});
   const [emailInputs,setEmailInputs]=useState({});
   const [filterRole,setFilterRole]=useState('all');
+  const [showInvite,setShowInvite]=useState(false);
+  const [invForm,setInvForm]=useState({email:'',name:'',title:'COO'});
+  const [invBusy,setInvBusy]=useState(false);
+  const [invMsg,setInvMsg]=useState('');
+
+  async function inviteHQ(){
+    if(!invForm.email||!invForm.name)return;
+    setInvBusy(true);setInvMsg('');
+    const tempPass=Math.random().toString(36).slice(-10)+'A1!';
+    const{data:user,error}=await sb.auth.signUp({email:invForm.email,password:tempPass,options:{data:{name:invForm.name}}});
+    if(user?.user){
+      const{error:upsertErr}=await sb.from('profiles').upsert([{id:user.user.id,full_name:invForm.name,name:invForm.name,title:invForm.title||'Team',role:'hq',is_active:true}],{onConflict:'id'});
+      if(upsertErr){setInvMsg('Account auth created, but profile save failed: '+upsertErr.message);}
+      else{setInvMsg(`Account created for ${invForm.name}. Temp password: ${tempPass} — share this securely and ask them to change it on first login.`);}
+      setInvForm({email:'',name:'',title:'COO'});
+      load();
+    }else{setInvMsg(error?.message||'Error creating account.');}
+    setInvBusy(false);
+  }
 
   async function load(){
     setLoading(true);
@@ -2208,13 +2228,26 @@ function AccountManager({onBadgeRefresh}){
       return;
     }
     if(!window.confirm(`Send a password reset email to ${email}?\nThe franchisee will get a link to set a new password.`))return;
-    const{error}=await sb.auth.resetPasswordForEmail(email,{redirectTo:'https://uglyops.netlify.app'});
-    if(error){
-      const detail=error.message||error.error_description||error.msg||(error.status?`status ${error.status}`:'')||JSON.stringify(error);
-      window.alert('Could not send reset email.\n\nReason: '+detail+'\n\nThis is often the email rate limit on Supabase built-in mailer (only a few per hour). If it keeps failing, the franchisee can use "Forgot password?" on the login screen.');
-      return;
+    // Send via Resend (reliable). Fall back to Supabase built-in mailer if the function fails.
+    try{
+      const res=await fetch(RESET_PW_FN,{
+        method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({email,name:m.full_name||m.name||''}),
+      });
+      const data=await res.json().catch(()=>({}));
+      if(res.ok&&data.ok){
+        window.alert(`Password reset link sent to ${email}.`);
+        return;
+      }
+      const fnReason=data.error||(`status ${res.status}`);
+      const{error:fbErr}=await sb.auth.resetPasswordForEmail(email,{redirectTo:'https://uglyops.netlify.app'});
+      if(!fbErr){window.alert(`Password reset link sent to ${email}.`);return;}
+      window.alert('Could not send reset email.\n\nResend reason: '+fnReason+'\nBuilt-in mailer reason: '+(fbErr.message||JSON.stringify(fbErr))+'\n\nThe franchisee can also use "Forgot password?" on the login screen.');
+    }catch(e){
+      const{error:fbErr}=await sb.auth.resetPasswordForEmail(email,{redirectTo:'https://uglyops.netlify.app'});
+      if(!fbErr){window.alert(`Password reset link sent to ${email}.`);return;}
+      window.alert('Could not send reset email.\n\nReason: '+(e.message||String(e))+'\n\nThe franchisee can also use "Forgot password?" on the login screen.');
     }
-    window.alert(`Password reset link sent to ${email}.`);
   }
 
   async function approveStore(s){
@@ -2264,8 +2297,37 @@ function AccountManager({onBadgeRefresh}){
     <>
       <div className="page-header">
         <div><div className="page-title">Accounts</div><div className="page-sub">Franchisee and HQ account management</div></div>
+        <button className="btn btn-primary" onClick={()=>setShowInvite(s=>!s)}>+ Add HQ Member</button>
       </div>
       <div className="content">
+        {showInvite&&(
+          <div className="card" style={{marginBottom:20}}>
+            <div style={{fontWeight:700,marginBottom:12}}>Add HQ Team Member</div>
+            <div className="form-row" style={{display:'flex',gap:12,flexWrap:'wrap'}}>
+              <div className="form-group" style={{flex:1,minWidth:200}}><label>Full Name</label><input value={invForm.name} onChange={e=>setInvForm(f=>({...f,name:e.target.value}))} placeholder="Tom Alcott" style={{width:'100%',background:'var(--panel2)',border:'1px solid var(--border2)',borderRadius:8,padding:'9px 12px',color:'var(--text)',fontFamily:'inherit',fontSize:14,outline:'none'}}/></div>
+              <div className="form-group" style={{flex:1,minWidth:200}}><label>Email</label><input type="email" value={invForm.email} onChange={e=>setInvForm(f=>({...f,email:e.target.value}))} placeholder="tom@uglydonuts.com" style={{width:'100%',background:'var(--panel2)',border:'1px solid var(--border2)',borderRadius:8,padding:'9px 12px',color:'var(--text)',fontFamily:'inherit',fontSize:14,outline:'none'}}/></div>
+            </div>
+            <div className="form-group" style={{maxWidth:320,marginTop:12}}>
+              <label>Title / Role</label>
+              <select value={['CEO','COO','CMO','CBO','CPO','other'].includes(invForm.title)?invForm.title:'other'} onChange={e=>{if(e.target.value!=='other')setInvForm(f=>({...f,title:e.target.value}));else setInvForm(f=>({...f,title:''}));}} style={{width:'100%',background:'var(--panel2)',border:'1px solid var(--border2)',borderRadius:8,padding:'9px 12px',color:'var(--text)',fontFamily:'inherit',fontSize:14,outline:'none'}}>
+                <option value="CEO">CEO</option>
+                <option value="COO">COO</option>
+                <option value="CMO">CMO</option>
+                <option value="CBO">CBO</option>
+                <option value="CPO">CPO</option>
+                <option value="other">Other (type below)</option>
+              </select>
+              {(!['CEO','COO','CMO','CBO','CPO'].includes(invForm.title))&&(
+                <input value={invForm.title} onChange={e=>setInvForm(f=>({...f,title:e.target.value}))} placeholder="e.g. VP of Operations" style={{marginTop:8,width:'100%',background:'var(--panel2)',border:'1px solid var(--border2)',borderRadius:8,padding:'9px 12px',color:'var(--text)',fontFamily:'inherit',fontSize:14,outline:'none'}}/>
+              )}
+            </div>
+            <div style={{display:'flex',gap:8,alignItems:'center',marginTop:12}}>
+              <button className="btn btn-primary" onClick={inviteHQ} disabled={invBusy||!invForm.email||!invForm.name}>{invBusy?'Creating...':'Create Account'}</button>
+              <button className="btn btn-ghost" onClick={()=>{setShowInvite(false);setInvMsg('');}}>Cancel</button>
+            </div>
+            {invMsg&&<div style={{marginTop:12,padding:12,background:'rgba(95,184,122,.1)',border:'1px solid rgba(95,184,122,.3)',borderRadius:8,fontSize:13,color:'var(--green)',lineHeight:1.5}}>{invMsg}</div>}
+          </div>
+        )}
         {/* Pending activation */}
         {unregistered.length>0&&(
           <div style={{marginBottom:24}}>
