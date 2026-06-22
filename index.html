@@ -467,19 +467,26 @@ function Dashboard({setView}){
   const [stats,setStats]=useState({stores:0,activeTasks:0,pending:0});
   const [taskStats,setTaskStats]=useState([]);
   const [storeStats,setStoreStats]=useState([]);
+  const [announceStats,setAnnounceStats]=useState([]);
   const [popup,setPopup]=useState(null); // 'stores' | 'tasks' | 'pending'
   const [popupData,setPopupData]=useState([]);
 
   useEffect(()=>{
     async function load(){
-      const[storesRes,tasksRes,assignRes]=await Promise.all([
-        sb.from('franchisees').select('id,name,territory').in('status',['open','soft_open']),
+      const[storesRes,tasksRes,assignRes,annRes,annReceiptRes,profRes]=await Promise.all([
+        sb.from('franchisees').select('id,name,store_name,territory').in('status',['open','soft_open']),
         sb.from('ops_tasks').select('*').eq('status','active').order('created_at',{ascending:false}),
         sb.from('ops_assignments').select('ops_task_id,franchisee_id,status'),
+        sb.from('ops_announcements').select('*').eq('active',true).order('created_at',{ascending:false}),
+        sb.from('ops_announcement_receipts').select('announcement_id,franchisee_id,confirmed'),
+        sb.from('profiles').select('franchisee_id').eq('role','franchisee'),
       ]);
       const stores=storesRes.data||[];
       const tasks=tasksRes.data||[];
       const assigns=assignRes.data||[];
+      const anns=annRes.data||[];
+      const receipts=annReceiptRes.data||[];
+      const linkedIds=new Set((profRes.data||[]).map(p=>p.franchisee_id).filter(Boolean));
       const pending=assigns.filter(a=>a.status==='submitted').length;
       setStats({stores:stores.length,activeTasks:tasks.length,pending});
 
@@ -494,13 +501,22 @@ function Dashboard({setView}){
       });
       setTaskStats(perTask);
 
-      // Per-store completion (across all active tasks)
-      if(stores.length&&tasks.length){
+      // Per-announcement confirmation rates
+      const perAnn=anns.map(a=>{
+        const r=receipts.filter(x=>x.announcement_id===a.id&&x.confirmed);
+        const confirmed=r.length;
+        const total=stores.length;
+        return{...a,confirmed,total,pct:total?Math.round(confirmed/total*100):0};
+      });
+      setAnnounceStats(perAnn);
+
+      // Per-store completion (across all active tasks). Flag stores with no portal account yet.
+      if(stores.length){
         const taskIds=tasks.map(t=>t.id);
         const perStore=stores.map(s=>{
           const mine=assigns.filter(a=>a.franchisee_id===s.id&&taskIds.includes(a.ops_task_id));
           const done=mine.filter(a=>a.status==='approved').length;
-          return{...s,done,total:mine.length,pct:mine.length?Math.round(done/mine.length*100):0};
+          return{...s,done,total:mine.length,pct:mine.length?Math.round(done/mine.length*100):0,noAccount:!linkedIds.has(s.id)};
         }).sort((a,b)=>a.pct-b.pct);
         setStoreStats(perStore);
       }
@@ -605,11 +621,39 @@ function Dashboard({setView}){
                 <div>
                   <span style={{fontSize:13,fontWeight:600}}>{s.name}</span>
                   <span style={{fontSize:11,color:'var(--muted)',marginLeft:8}}>{s.territory}</span>
+                  {s.noAccount&&<span onClick={()=>setView('accounts')} style={{fontSize:10,fontWeight:700,color:'var(--red)',background:'rgba(224,82,82,.12)',border:'1px solid rgba(224,82,82,.3)',borderRadius:6,padding:'2px 7px',marginLeft:8,cursor:'pointer',whiteSpace:'nowrap'}}>● APPROVE PENDING</span>}
                 </div>
-                <span style={{fontSize:12,color:s.pct===100?'var(--green)':s.pct>50?'var(--gold)':'var(--muted)',fontWeight:600}}>{s.done}/{s.total} · {s.pct}%</span>
+                {s.noAccount?(
+                  <span style={{fontSize:11,color:'var(--muted)'}}>no portal account</span>
+                ):(
+                  <span style={{fontSize:12,color:s.pct===100?'var(--green)':s.pct>50?'var(--gold)':'var(--muted)',fontWeight:600}}>{s.done}/{s.total} · {s.pct}%</span>
+                )}
               </div>
               <div className="progress-bar">
-                <div className="progress-fill" style={{width:`${s.pct}%`,background:s.pct===100?'var(--green)':'var(--orange)'}}/>
+                <div className="progress-fill" style={{width:`${s.noAccount?0:s.pct}%`,background:s.pct===100?'var(--green)':'var(--orange)'}}/>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Announcement confirmation rates */}
+        <div className="card" style={{marginTop:16}}>
+          <div style={{fontWeight:700,marginBottom:14,display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+            Announcement Confirmations
+            <button className="btn btn-ghost btn-sm" onClick={()=>setView('tasks')}>Manage →</button>
+          </div>
+          {announceStats.length===0&&<div style={{color:'var(--muted)',fontSize:13}}>No active announcements.</div>}
+          {announceStats.map(a=>(
+            <div key={a.id} style={{marginBottom:14,paddingBottom:14,borderBottom:'1px solid var(--border)'}}>
+              <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:6}}>
+                <span style={{flex:1,fontSize:13,fontWeight:600}}>{a.title}</span>
+                <span style={{fontSize:12,fontWeight:700,color:a.pct===100?'var(--green)':a.pct>50?'var(--gold)':'var(--muted)',minWidth:36,textAlign:'right'}}>{a.pct}%</span>
+              </div>
+              <div style={{display:'flex',alignItems:'center',gap:10}}>
+                <div className="progress-bar" style={{flex:1}}>
+                  <div className="progress-fill" style={{width:`${a.pct}%`,background:a.pct===100?'var(--green)':'var(--orange)'}}/>
+                </div>
+                <span style={{fontSize:11,color:'var(--muted)',whiteSpace:'nowrap'}}>{a.confirmed}/{a.total} confirmed</span>
               </div>
             </div>
           ))}
@@ -1846,14 +1890,23 @@ function HQMessages({onBadgeRefresh}){
 // Build a unified thread array from a message + its replies
 function buildThread(message,replies){
   const thread=[];
-  // First bubble: original franchisee message
-  thread.push({role:'franchisee',name:message.sender_name||message.store_name,body:message.body,at:message.created_at});
+  // First bubble: the original message. Usually from the franchisee, but HQ can
+  // also start a thread (sender_name is exactly 'HQ'), so infer the side from that.
+  const firstRole=message.sender_name==='HQ'?'hq':'franchisee';
+  thread.push({role:firstRole,name:message.sender_name||message.store_name,body:message.body,at:message.created_at});
   // Legacy single HQ reply (if exists and pre-dates the replies table)
   if(message.hq_reply&&message.hq_reply.trim()){
     thread.push({role:'hq',name:message.replied_by||'HQ',body:message.hq_reply,at:message.replied_at||message.created_at,legacy:true});
   }
-  // Threaded replies
-  (replies||[]).forEach(r=>thread.push({role:r.sender_role,name:r.sender_name,body:r.body,at:r.created_at}));
+  // Threaded replies. Guard against a missing/blank sender_role (older rows):
+  // infer from sender_name so bubbles still align to the correct side.
+  (replies||[]).forEach(r=>{
+    let role=r.sender_role;
+    if(role!=='hq'&&role!=='franchisee'){
+      role=r.sender_name==='HQ'?'hq':'franchisee';
+    }
+    thread.push({role,name:r.sender_name,body:r.body,at:r.created_at});
+  });
   // Sort by time
   thread.sort((a,b)=>new Date(a.at)-new Date(b.at));
   return thread;
@@ -2143,14 +2196,24 @@ function AccountManager({onBadgeRefresh}){
   useEffect(()=>{load();},[]);
 
   async function sendPasswordReset(m){
-    const email=m._email;
+    // Resolve email: prefer the mapped _email, then look it up directly by store match.
+    let email=m._email;
     if(!email){
-      window.alert('No email on file for this franchisee. Add their email in OS → Franchisees (Edit Info) first.');
+      const{data:frs}=await sb.from('franchisees').select('store_name,name,email').in('status',['open','soft_open']);
+      const match=(frs||[]).find(f=>f.store_name===m.store||f.name===m.store);
+      email=match?.email||null;
+    }
+    if(!email){
+      window.alert('No email on file for this franchisee.\n\nAdd their email in OS → CRM Franchisees (Edit Info), then try again.\n\nNote: the store name on the account must match the franchisee record exactly.');
       return;
     }
     if(!window.confirm(`Send a password reset email to ${email}?\nThe franchisee will get a link to set a new password.`))return;
     const{error}=await sb.auth.resetPasswordForEmail(email,{redirectTo:'https://uglyops.netlify.app'});
-    if(error){window.alert('Error: '+error.message);return;}
+    if(error){
+      const detail=error.message||error.error_description||error.msg||(error.status?`status ${error.status}`:'')||JSON.stringify(error);
+      window.alert('Could not send reset email.\n\nReason: '+detail+'\n\nThis is often the email rate limit on Supabase built-in mailer (only a few per hour). If it keeps failing, the franchisee can use "Forgot password?" on the login screen.');
+      return;
+    }
     window.alert(`Password reset link sent to ${email}.`);
   }
 
@@ -2798,6 +2861,7 @@ function FranchiseePortal({session, profile}){
   const [hqReplyCount,setHqReplyCount]=useState(0);
   const [taskCount,setTaskCount]=useState(0);
   const [announceCount,setAnnounceCount]=useState(0);
+  const [warningCount,setWarningCount]=useState(0);
   const storeName=profile?.store||profile?.full_name||profile?.name||'My Store';
 
   const resolveFrId=useCallback(async()=>{
@@ -2824,17 +2888,27 @@ function FranchiseePortal({session, profile}){
     const confirmedIds=new Set((rRes.data||[]).filter(r=>r.confirmed).map(r=>r.announcement_id));
     const unconfirmed=(aRes.data||[]).filter(a=>!confirmedIds.has(a.id)).length;
     setAnnounceCount(unconfirmed);
+    // Warning history: My Standing tab only appears if this store has ever received a warning.
+    const{count:wc}=await sb.from('ops_warnings').select('id',{count:'exact',head:true}).eq('franchisee_id',frId);
+    setWarningCount(wc||0);
   },[resolveFrId]);
 
   useEffect(()=>{
     refreshBadges();const t=setInterval(refreshBadges,60000);return()=>clearInterval(t);
   },[refreshBadges]);
 
+  // If the My Standing tab is hidden (no warnings) but somehow selected, fall back to tasks.
+  useEffect(()=>{
+    if(portalView==='warnings'&&warningCount===0)setPortalView('tasks');
+  },[portalView,warningCount]);
+
   const navItems=[
     {key:'tasks',    icon:'▤', label:'My Tasks', badge:taskCount||null},
     {key:'announce', icon:'◈', label:'Announcements', badge:announceCount||null},
     {key:'contact',  icon:'✉', label:'Contact HQ', badge:hqReplyCount||null},
-    {key:'warnings', icon:'⚠', label:'My Standing'},
+    // My Standing only shows once a store has received a warning — no need to alarm
+    // franchisees in good standing who have never been warned.
+    ...(warningCount>0?[{key:'warnings', icon:'⚠', label:'My Standing'}]:[]),
     {key:'bot',      icon:'◉', label:'UglyBot'},
     {key:'password', icon:'◎', label:'Settings'},
   ];
@@ -2867,7 +2941,7 @@ function FranchiseePortal({session, profile}){
         {portalView==='tasks'&&<FranchiseeTasks profile={profile} onUpdate={refreshBadges}/>}
         {portalView==='announce'&&<FranchiseeAnnouncements profile={profile} onUpdate={refreshBadges}/>}
         {portalView==='contact'&&<ContactHQ profile={profile} storeName={storeName} onSeen={refreshBadges}/>}
-        {portalView==='warnings'&&<FranchiseeWarnings profile={profile} storeName={storeName}/>}
+        {portalView==='warnings'&&warningCount>0&&<FranchiseeWarnings profile={profile} storeName={storeName}/>}
         {portalView==='bot'&&<UglyBotPortal storeName={storeName}/>}
         {portalView==='password'&&<ChangePassword onDone={()=>setPortalView('tasks')}/>}
       </main>
