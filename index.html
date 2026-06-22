@@ -290,8 +290,14 @@ function App(){
   const [profile,setProfile]=useState(null);
   const [loading,setLoading]=useState(true);
   const [view,setView]=useState('dashboard');
+  const [recoveryMode,setRecoveryMode]=useState(false);
 
   useEffect(()=>{
+    // Fallback: if the page was opened from a reset link, the URL hash contains
+    // type=recovery. Catch it directly in case the auth event fires before our listener.
+    if(typeof window!=='undefined'&&window.location.hash.includes('type=recovery')){
+      setRecoveryMode(true);
+    }
     sb.auth.getSession().then(async({data})=>{
       setSession(data.session);
       if(data.session){
@@ -304,7 +310,8 @@ function App(){
       }
       setLoading(false);
     });
-    const{data:{subscription}}=sb.auth.onAuthStateChange(async(_,s)=>{
+    const{data:{subscription}}=sb.auth.onAuthStateChange(async(event,s)=>{
+      if(event==='PASSWORD_RECOVERY'){setRecoveryMode(true);}
       setSession(s);
       if(s){
         const{data:p,error}=await sb.from('profiles').select('*').eq('id',s.user.id).maybeSingle();
@@ -319,6 +326,9 @@ function App(){
   },[]);
 
   if(loading)return<div className="loading">Loading...</div>;
+  // Password recovery: user arrived via a reset link. Show the set-new-password
+  // screen before anything else, regardless of role or session state.
+  if(recoveryMode)return<ResetPasswordScreen onDone={()=>{setRecoveryMode(false);}}/>;
   if(!session)return<AuthScreen/>;
   // Profile failed to load — don't guess the role. Ask them to retry rather than
   // risk routing a franchisee into HQ screens.
@@ -340,6 +350,65 @@ function App(){
   // Route by role
   if(profile?.role==='franchisee')return<FranchiseePortal session={session} profile={profile}/>;
   return<MainApp view={view} setView={setView} session={session}/>;
+}
+
+function ResetPasswordScreen({onDone}){
+  const [newPass,setNewPass]=useState('');
+  const [confirm,setConfirm]=useState('');
+  const [busy,setBusy]=useState(false);
+  const [err,setErr]=useState('');
+  const [done,setDone]=useState(false);
+
+  async function save(e){
+    e.preventDefault();
+    if(newPass.length<8){setErr('Password must be at least 8 characters.');return;}
+    if(newPass!==confirm){setErr('Passwords do not match.');return;}
+    setBusy(true);setErr('');
+    const{error}=await sb.auth.updateUser({password:newPass});
+    if(error){setErr(error.message||'Could not update password. The reset link may have expired — request a new one.');setBusy(false);return;}
+    setDone(true);setBusy(false);
+    // Sign out so they log in fresh with the new password.
+    await sb.auth.signOut();
+  }
+
+  if(done){
+    return(
+      <div className="auth-wrap">
+        <div className="auth-card" style={{textAlign:'center'}}>
+          <div className="auth-logo">Ugly Donuts</div>
+          <div className="auth-app">Franchise Ops</div>
+          <div style={{color:'var(--green)',fontSize:15,fontWeight:600,margin:'24px 0 8px'}}>Password updated</div>
+          <div style={{color:'var(--muted)',fontSize:13,marginBottom:20,lineHeight:1.6}}>You can now sign in with your new password.</div>
+          <button className="btn-gold" onClick={onDone}>Go to Sign In</button>
+        </div>
+      </div>
+    );
+  }
+
+  return(
+    <div className="auth-wrap">
+      <div className="auth-card">
+        <div style={{textAlign:'center'}}>
+          <div className="auth-logo">Ugly Donuts</div>
+          <div className="auth-app">Franchise Ops</div>
+        </div>
+        <div style={{fontSize:15,fontWeight:700,margin:'20px 0 4px'}}>Set a new password</div>
+        <div style={{fontSize:13,color:'var(--muted)',marginBottom:18,lineHeight:1.5}}>Enter a new password for your account below.</div>
+        <form onSubmit={save}>
+          <div className="form-group">
+            <label>New Password</label>
+            <input type="password" value={newPass} onChange={e=>setNewPass(e.target.value)} placeholder="Min. 8 characters" autoFocus/>
+          </div>
+          <div className="form-group">
+            <label>Confirm Password</label>
+            <input type="password" value={confirm} onChange={e=>setConfirm(e.target.value)} placeholder="Repeat new password"/>
+          </div>
+          {err&&<div style={{color:'var(--red)',fontSize:13,marginBottom:12}}>{err}</div>}
+          <button type="submit" className="btn-gold" style={{width:'100%'}} disabled={busy||!newPass||!confirm}>{busy?'Saving...':'Update Password'}</button>
+        </form>
+      </div>
+    </div>
+  );
 }
 
 function AuthScreen(){
