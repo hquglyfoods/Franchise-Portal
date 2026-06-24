@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Ugly Donuts — Franchise Ops</title>
 <script src="https://unpkg.com/react@18.3.1/umd/react.production.min.js"></script>
 <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
@@ -158,7 +158,7 @@ body.modal-open{overflow:hidden;}
   .bot-msgs{padding:14px 16px!important;}
   .bot-input{padding:12px 16px!important;}
   .app{flex-direction:column;}
-  .sidebar{width:100%;height:auto;position:static;flex-direction:column;border-right:none;border-bottom:1px solid var(--border);}
+  .sidebar{width:100%;height:auto;position:static;flex-direction:column;border-right:none;border-bottom:1px solid var(--border);padding-top:env(safe-area-inset-top);}
   .sidebar-logo{padding:14px 16px 10px;}
   /* nav becomes a button grid: franchisee (<=6 items) = 2 rows, HQ (9 items) = 3 rows */
   .sidebar .nav{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;padding:8px 12px;}
@@ -186,7 +186,11 @@ body.modal-open{overflow:hidden;}
   .card{padding:16px!important;}
   .modal-overlay{padding:0;align-items:flex-end;}
   .modal{max-width:100%!important;width:100%!important;max-height:100%!important;border-radius:16px 16px 0 0;}
-  .modal-header{padding:16px;}
+  .modal-header{padding:16px;padding-top:calc(16px + env(safe-area-inset-top));}
+  /* task wizard step indicator: drop the connector lines and allow wrap so it never cuts off */
+  .wizard-steps{flex-wrap:wrap!important;gap:8px 14px!important;margin-bottom:18px!important;}
+  .wizard-steps .wizard-conn{display:none!important;}
+  .wizard-steps span{font-size:12px!important;}
   .modal-body{padding:16px!important;}
   .modal-footer{padding:12px 16px;flex-wrap:wrap;}
   .modal-footer .btn{flex:1;min-width:0;}
@@ -1367,7 +1371,7 @@ function BroadcastTask({onDone}){
       </div>
       <div className="content">
         {/* Step indicator */}
-        <div style={{display:'flex',gap:0,marginBottom:28}}>
+        <div className="wizard-steps" style={{display:'flex',gap:0,marginBottom:28}}>
           {[{n:1,l:'Task Info'},{n:2,l:'Sub-Tasks'},{n:3,l:'Target & Send'}].map((s,i)=>(
             <div key={s.n} style={{display:'flex',alignItems:'center'}}>
               <div style={{display:'flex',alignItems:'center',gap:8,cursor:step>s.n?'pointer':'default'}} onClick={()=>{if(step>s.n||stepValid[step])setStep(s.n);}}>
@@ -1376,7 +1380,7 @@ function BroadcastTask({onDone}){
                 </div>
                 <span style={{fontSize:13,fontWeight:step===s.n?700:400,color:step===s.n?'var(--orange)':step>s.n?'var(--green)':'var(--muted)'}}>{s.l}</span>
               </div>
-              {i<2&&<div style={{width:40,height:1,background:'var(--border)',margin:'0 12px'}}/>}
+              {i<2&&<div className="wizard-conn" style={{width:40,height:1,background:'var(--border)',margin:'0 12px'}}/>}
             </div>
           ))}
         </div>
