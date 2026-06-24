@@ -161,8 +161,8 @@ body.modal-open{overflow:hidden;}
   .sidebar{width:100%;height:auto;position:static;flex-direction:column;border-right:none;border-bottom:1px solid var(--border);}
   .sidebar-logo{padding:14px 16px 10px;}
   /* nav becomes a button grid: franchisee (<=6 items) = 2 rows, HQ (9 items) = 3 rows */
-  .sidebar .nav{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:10px 12px;}
-  .nav-item{position:relative;display:flex;align-items:center;justify-content:center;text-align:center;white-space:normal;line-height:1.2;width:auto!important;min-height:46px;padding:8px 6px;font-size:12px;font-weight:600;border:1px solid var(--border2)!important;border-radius:10px;background:var(--panel2);}
+  .sidebar .nav{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;padding:8px 12px;}
+  .nav-item{position:relative;display:flex;align-items:center;justify-content:center;text-align:center;white-space:normal;line-height:1.15;width:auto!important;min-height:34px;padding:5px 6px;font-size:12px;font-weight:600;border:1px solid var(--border2)!important;border-radius:9px;background:var(--panel2);}
   .nav-item:hover{background:var(--panel2);}
   .nav-item.active{background:rgba(20,184,166,.15);border-color:var(--teal)!important;color:var(--teal-bright);}
   .nav-icon{display:none!important;}
@@ -171,8 +171,14 @@ body.modal-open{overflow:hidden;}
   input,textarea,select{font-size:16px!important;}
   .sidebar .sidebar-footer, .sidebar-bottom{flex-direction:row;overflow-x:auto;}
   .main{width:100%;}
-  .page-header{padding:16px 16px 12px;flex-wrap:wrap;gap:10px;position:static;}
-  .page-title{font-size:20px!important;}
+  /* mobile: drop the per-screen title/subtitle boxes (they only waste vertical space);
+     keep any action controls (buttons, links, search/inputs). Headers with no control
+     collapse entirely. Applies to both HQ and franchisee portals. */
+  .page-header{padding:8px 16px;min-height:0;flex-wrap:wrap;gap:8px;position:static;}
+  .page-header .page-title,.page-header .page-sub{display:none!important;}
+  .page-header:not(:has(button)):not(:has(a)):not(:has(input)):not(:has(select)):not(:has(.btn)):not(:has([role="button"])){display:none!important;padding:0!important;border:none!important;}
+  /* franchisee top banner box removed on mobile */
+  .portal-banner{display:none!important;}
   .content{padding:16px;}
   .card-grid-4{grid-template-columns:repeat(2,1fr);gap:10px;}
   .card-grid-2{grid-template-columns:1fr;gap:12px;}
@@ -3342,12 +3348,13 @@ function FranchiseePortal({session, profile}){
           ))}
         </nav>
         <div className="sidebar-footer">
+          <div style={{fontSize:12,fontWeight:600,color:'var(--text)',marginBottom:2}}>{storeName}</div>
           <div style={{marginBottom:4,fontSize:11,color:'var(--muted)'}}>{session.user.email}</div>
           <button onClick={()=>sb.auth.signOut()} style={{color:'var(--red)'}}>Sign out</button>
         </div>
       </aside>
-      <main className="main">
-        <div style={{background:'var(--panel)',borderBottom:'1px solid var(--border)',padding:'12px 32px',textAlign:'center'}}>
+      <main className="main portal-main">
+        <div className="portal-banner" style={{background:'var(--panel)',borderBottom:'1px solid var(--border)',padding:'12px 32px',textAlign:'center'}}>
           <div style={{fontSize:11,fontWeight:700,color:'var(--orange)',letterSpacing:'.12em',textTransform:'uppercase'}}>Franchisee Portal</div>
           <div style={{fontSize:12,color:'var(--muted)',marginTop:2}}>{storeName}</div>
         </div>
@@ -4189,6 +4196,7 @@ function UglyBotPortal({storeName}){
     <>
       <div className="page-header">
         <div><div className="page-title">UglyBot</div><div className="page-sub">AI assistant for operations, recipes, and support</div></div>
+        {src&&<a href={src} target="_blank" rel="noopener" className="btn btn-ghost btn-sm" style={{marginLeft:'auto'}}>Open in new tab ↗</a>}
       </div>
       <div ref={shellRef} className="bot-shell" style={{padding:0}}>
         {src&&<iframe src={src} title="UglyBot"
