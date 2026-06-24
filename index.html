@@ -1655,6 +1655,20 @@ function StoreDetailModal({store,tasks,assignments,onClose}){
 // ── HQ WARNINGS (official warnings, 3-strike rule) ────────
 const WARN_CATEGORIES=['Missed Deadline','Quality','Compliance','Conduct','Other'];
 
+// Deadline countdown helper. Returns null if no deadline set.
+function deadlineInfo(deadline){
+  if(!deadline)return null;
+  const today=new Date();today.setHours(0,0,0,0);
+  const d=new Date(deadline+'T00:00:00');
+  const diff=Math.round((d.getTime()-today.getTime())/(24*60*60*1000));
+  let label,color;
+  if(diff>0){label='D-'+diff;color=diff<=3?'var(--red)':diff<=7?'var(--gold)':'var(--blue)';}
+  else if(diff===0){label='D-DAY';color='var(--red)';}
+  else{label='OVERDUE +'+Math.abs(diff)+'d';color='var(--red)';}
+  const dateStr=d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+  return {label,color,diff,dateStr,overdue:diff<0};
+}
+
 function HQWarnings(){
   const [stores,setStores]=useState([]);
   const [warnings,setWarnings]=useState([]);
@@ -1677,7 +1691,7 @@ function HQWarnings(){
   // Count active warnings within last 365 days per store
   const oneYearAgo=new Date(Date.now()-365*24*60*60*1000);
   function activeCount(frId){
-    return warnings.filter(w=>w.franchisee_id===frId&&w.status==='active'&&new Date(w.issued_at)>=oneYearAgo).length;
+    return warnings.filter(w=>w.franchisee_id===frId&&w.status!=='rescinded'&&new Date(w.issued_at)>=oneYearAgo).length;
   }
 
   // Stores sorted by warning count (most at-risk first)
@@ -1732,14 +1746,17 @@ function HQWarnings(){
           <div style={{color:'var(--muted)',fontSize:13,padding:'10px 0'}}>No warnings issued yet.</div>
         ):warnings.map(w=>{
           const expired=new Date(w.issued_at)<oneYearAgo;
+          const dl=deadlineInfo(w.deadline);
           return(
-            <div key={w.id} onClick={()=>setDetail(w)} style={{background:'var(--panel)',border:'1px solid var(--border)',borderLeft:`3px solid ${w.status==='rescinded'?'var(--muted2)':expired?'var(--border2)':'var(--red)'}`,borderRadius:10,padding:14,marginBottom:10,cursor:'pointer',opacity:w.status==='rescinded'||expired?0.65:1}}>
+            <div key={w.id} onClick={()=>setDetail(w)} style={{background:'var(--panel)',border:'1px solid var(--border)',borderLeft:`3px solid ${w.status==='rescinded'?'var(--muted2)':w.status==='submitted'?'var(--gold)':expired?'var(--border2)':'var(--red)'}`,borderRadius:10,padding:14,marginBottom:10,cursor:'pointer',opacity:w.status==='rescinded'||expired?0.65:1}}>
               <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:4,flexWrap:'wrap',gap:6}}>
                 <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
                   <span style={{fontSize:11,fontWeight:700,background:'rgba(224,82,82,.15)',color:'var(--red)',padding:'2px 8px',borderRadius:999}}>{w.category}</span>
                   <span style={{fontSize:14,fontWeight:700}}>{w.store_name}</span>
+                  {w.status==='submitted'&&<span style={{fontSize:10,color:'var(--gold)',fontWeight:700,textTransform:'uppercase'}}>● Submitted for review</span>}
                   {w.status==='rescinded'&&<span style={{fontSize:10,color:'var(--muted)',fontWeight:700,textTransform:'uppercase'}}>Rescinded</span>}
-                  {expired&&w.status==='active'&&<span style={{fontSize:10,color:'var(--muted)',fontWeight:700,textTransform:'uppercase'}}>Expired (&gt;12mo)</span>}
+                  {expired&&w.status!=='rescinded'&&<span style={{fontSize:10,color:'var(--muted)',fontWeight:700,textTransform:'uppercase'}}>Expired (&gt;12mo)</span>}
+                  {dl&&w.status!=='rescinded'&&!expired&&<span style={{fontSize:10,fontWeight:700,color:dl.color,border:`1px solid ${dl.color}`,padding:'1px 7px',borderRadius:999}}>{dl.label}</span>}
                 </div>
                 <span style={{fontSize:11,color:'var(--muted)'}}>{new Date(w.issued_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}</span>
               </div>
@@ -1759,20 +1776,26 @@ function IssueWarningModal({stores,onClose}){
   const [frId,setFrId]=useState('');
   const [category,setCategory]=useState('');
   const [reason,setReason]=useState('');
+  const [deadline,setDeadline]=useState('');
   const [severity,setSeverity]=useState('standard');
   const [busy,setBusy]=useState(false);
   const [msg,setMsg]=useState('');
+
+  // Default the deadline picker minimum to tomorrow.
+  const minDeadline=(()=>{const d=new Date();d.setDate(d.getDate()+1);return d.toISOString().slice(0,10);})();
 
   async function issue(){
     if(!frId){setMsg('Please select a store.');return;}
     if(!category){setMsg('Please select a category.');return;}
     if(!reason.trim()){setMsg('Reason is required (official record).');return;}
+    if(!deadline){setMsg('A correction deadline is required.');return;}
     setBusy(true);setMsg('');
     const store=stores.find(s=>s.id===frId);
     const storeName=store?.store_name||store?.name||'';
+    const dlStr=new Date(deadline+'T00:00:00').toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'});
     const{error}=await sb.from('ops_warnings').insert([{
       franchisee_id:frId,store_name:storeName,category,reason:reason.trim(),
-      severity,status:'active',issued_by:'HQ',
+      severity,status:'active',issued_by:'HQ',deadline,
     }]);
     if(error){setMsg('Error: '+error.message);setBusy(false);return;}
     // Official email notification to franchisee
@@ -1783,7 +1806,7 @@ function IssueWarningModal({stores,onClose}){
           body:JSON.stringify({
             to:store.email,
             subject:`OFFICIAL WARNING — Ugly Donuts & Corn Dogs Franchise`,
-            html:`<div style="font-family:sans-serif;max-width:600px;margin:0 auto;background:#0E0E0E;color:#F0EDE8;padding:32px;border-radius:12px;"><div style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#E05252;margin-bottom:8px;font-weight:700;">Official Warning Notice</div><h1 style="font-size:20px;margin:0 0 6px;">Franchise Compliance Warning</h1><p style="color:#8A8480;font-size:13px;margin:0 0 20px;">Issued to <strong style="color:#F0EDE8;">${storeName}</strong> on ${new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})}</p><div style="background:#1E1E1E;border:1px solid #E05252;border-radius:10px;padding:18px;margin-bottom:18px;"><div style="font-size:11px;color:#E05252;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;font-weight:700;">Category: ${category}</div><div style="font-size:14px;line-height:1.6;white-space:pre-wrap;">${reason.trim().replace(/</g,'&lt;')}</div></div><div style="background:rgba(224,82,82,.08);border:1px solid rgba(224,82,82,.25);border-radius:8px;padding:14px;margin-bottom:20px;"><p style="color:#E05252;font-size:13px;margin:0;line-height:1.5;"><strong>Important:</strong> Per the Franchise Agreement, three (3) active warnings within a twelve (12) month period may result in termination review. Please address this matter promptly.</p></div><a href="https://uglyops.netlify.app" style="display:inline-block;background:#14B8A6;color:#04201C;padding:11px 22px;border-radius:8px;text-decoration:none;font-weight:700;font-size:14px;">View in Franchise Ops →</a><p style="color:#5A5654;font-size:11px;margin-top:24px;">Ugly Donuts & Corn Dogs Franchising LLC · This is an official notice.</p></div>`,
+            html:`<div style="font-family:sans-serif;max-width:600px;margin:0 auto;background:#0E0E0E;color:#F0EDE8;padding:32px;border-radius:12px;"><div style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#E05252;margin-bottom:8px;font-weight:700;">Official Warning Notice</div><h1 style="font-size:20px;margin:0 0 6px;">Franchise Compliance Warning</h1><p style="color:#8A8480;font-size:13px;margin:0 0 20px;">Issued to <strong style="color:#F0EDE8;">${storeName}</strong> on ${new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})}</p><div style="background:#1E1E1E;border:1px solid #E05252;border-radius:10px;padding:18px;margin-bottom:18px;"><div style="font-size:11px;color:#E05252;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;font-weight:700;">Category: ${category}</div><div style="font-size:14px;line-height:1.6;white-space:pre-wrap;">${reason.trim().replace(/</g,'&lt;')}</div></div><div style="background:rgba(20,184,166,.08);border:1px solid rgba(20,184,166,.3);border-radius:8px;padding:14px;margin-bottom:18px;"><p style="color:#14B8A6;font-size:13px;margin:0;line-height:1.5;"><strong>Correction deadline: ${dlStr}.</strong> Please resolve this matter by the deadline and submit it for review in the Franchise Ops portal.</p></div><div style="background:rgba(224,82,82,.08);border:1px solid rgba(224,82,82,.25);border-radius:8px;padding:14px;margin-bottom:20px;"><p style="color:#E05252;font-size:13px;margin:0;line-height:1.5;"><strong>Important:</strong> Per the Franchise Agreement, three (3) active warnings within a twelve (12) month period may result in termination review. Please address this matter promptly.</p></div><a href="https://uglyops.netlify.app" style="display:inline-block;background:#14B8A6;color:#04201C;padding:11px 22px;border-radius:8px;text-decoration:none;font-weight:700;font-size:14px;">View in Franchise Ops →</a><p style="color:#5A5654;font-size:11px;margin-top:24px;">Ugly Donuts & Corn Dogs Franchising LLC · This is an official notice.</p></div>`,
           }),
         });
       }catch(e){/* best-effort */}
@@ -1826,11 +1849,16 @@ function IssueWarningModal({stores,onClose}){
             <label>Reason (official record)</label>
             <textarea value={reason} onChange={e=>setReason(e.target.value)} rows={5} placeholder="Describe the violation in detail. This becomes a permanent record." style={{resize:'vertical'}}/>
           </div>
+          <div className="form-group">
+            <label>Correction Deadline</label>
+            <input type="date" value={deadline} min={minDeadline} onChange={e=>setDeadline(e.target.value)} style={{width:'100%',background:'var(--panel2)',border:'1px solid var(--border2)',borderRadius:8,padding:'9px 12px',color:'var(--text)',fontFamily:'inherit',fontSize:14,outline:'none',colorScheme:'dark'}}/>
+            <div style={{fontSize:11,color:'var(--muted)',marginTop:4}}>The franchisee must resolve and submit for review by this date.</div>
+          </div>
           {msg&&<div style={{fontSize:13,color:msg.startsWith('✓')?'var(--green)':'var(--red)',marginBottom:8}}>{msg}</div>}
         </div>
         <div className="modal-footer">
           <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
-          <button className="btn btn-danger" onClick={issue} disabled={busy||!frId||!category||!reason.trim()}>{busy?'Issuing...':'Issue Warning'}</button>
+          <button className="btn btn-danger" onClick={issue} disabled={busy||!frId||!category||!reason.trim()||!deadline}>{busy?'Issuing...':'Issue Warning'}</button>
         </div>
       </div>
     </div>
@@ -1842,6 +1870,8 @@ function WarningDetailModal({warning,onClose}){
   const [msg,setMsg]=useState('');
   const [rescindMode,setRescindMode]=useState(false);
   const [rescindReason,setRescindReason]=useState('');
+  const dl=deadlineInfo(warning.deadline);
+  const reviewable=warning.status==='active'||warning.status==='submitted';
 
   async function rescind(){
     if(!rescindReason.trim()){setMsg('Please provide a reason for rescinding.');return;}
@@ -1854,14 +1884,24 @@ function WarningDetailModal({warning,onClose}){
     onClose();
   }
 
+  async function confirmWarning(){
+    setBusy(true);setMsg('');
+    const{error}=await sb.from('ops_warnings').update({status:'active'}).eq('id',warning.id);
+    setBusy(false);
+    if(error){setMsg('Error: '+error.message);return;}
+    onClose();
+  }
+
   return(
     <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
       <div className="modal">
         <div className="modal-header">
           <div>
-            <div style={{display:'flex',gap:8,alignItems:'center',marginBottom:4}}>
+            <div style={{display:'flex',gap:8,alignItems:'center',marginBottom:4,flexWrap:'wrap'}}>
               <span style={{fontSize:11,fontWeight:700,background:'rgba(224,82,82,.15)',color:'var(--red)',padding:'2px 8px',borderRadius:999}}>{warning.category}</span>
+              {warning.status==='submitted'&&<span style={{fontSize:10,color:'var(--gold)',fontWeight:700,textTransform:'uppercase'}}>● Submitted for review</span>}
               {warning.status==='rescinded'&&<span style={{fontSize:10,color:'var(--muted)',fontWeight:700,textTransform:'uppercase'}}>Rescinded</span>}
+              {dl&&warning.status!=='rescinded'&&<span style={{fontSize:10,fontWeight:700,color:dl.color,border:`1px solid ${dl.color}`,padding:'1px 7px',borderRadius:999}}>{dl.label}</span>}
             </div>
             <div className="modal-title" style={{margin:0}}>{warning.store_name}</div>
           </div>
@@ -1871,14 +1911,21 @@ function WarningDetailModal({warning,onClose}){
           <div style={{fontSize:11,color:'var(--muted)',marginBottom:6,textTransform:'uppercase',letterSpacing:'.06em',fontWeight:700}}>Reason</div>
           <div style={{background:'var(--panel2)',borderRadius:10,padding:16,fontSize:14,lineHeight:1.6,whiteSpace:'pre-wrap',marginBottom:16}}>{warning.reason}</div>
           {warning.related_task_title&&<div style={{fontSize:12,color:'var(--muted)',marginBottom:12}}>Related task: <strong style={{color:'var(--text)'}}>{warning.related_task_title}</strong></div>}
+          {dl&&<div style={{fontSize:12,color:'var(--muted)',marginBottom:8}}>Correction deadline: <strong style={{color:dl.overdue&&warning.status!=='rescinded'?'var(--red)':'var(--text)'}}>{dl.dateStr}</strong>{warning.status!=='rescinded'&&<span style={{color:dl.color,fontWeight:700}}> · {dl.label}</span>}</div>}
           <div style={{fontSize:11,color:'var(--muted2)',marginBottom:4}}>Issued by {warning.issued_by||'HQ'} on {new Date(warning.issued_at).toLocaleString('en-US',{month:'long',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'})}</div>
+          {warning.status==='submitted'&&(
+            <div style={{background:'rgba(204,156,58,.1)',border:'1px solid rgba(204,156,58,.3)',borderRadius:8,padding:12,marginTop:12}}>
+              <div style={{fontSize:12,color:'var(--gold)',fontWeight:700,marginBottom:2}}>Franchisee submitted this for review{warning.submitted_at?` on ${new Date(warning.submitted_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}`:''}.</div>
+              <div style={{fontSize:12,color:'var(--muted)',lineHeight:1.5}}>Review the correction. <strong>Confirm Warning</strong> if it was not properly resolved (warning stands), or <strong>Rescind Warning</strong> if resolved (removed from active count, record kept).</div>
+            </div>
+          )}
           {warning.status==='rescinded'&&(
             <div style={{background:'rgba(134,148,144,.1)',borderRadius:8,padding:12,marginTop:12}}>
               <div style={{fontSize:10,fontWeight:700,color:'var(--muted)',textTransform:'uppercase',marginBottom:4}}>Rescinded {warning.rescinded_at?`· ${new Date(warning.rescinded_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}`:''}</div>
               <div style={{fontSize:13,color:'var(--text)',lineHeight:1.5}}>{warning.rescinded_reason}</div>
             </div>
           )}
-          {warning.status==='active'&&rescindMode&&(
+          {reviewable&&rescindMode&&(
             <div style={{marginTop:16}}>
               <div className="form-group">
                 <label>Rescind Reason</label>
@@ -1889,11 +1936,16 @@ function WarningDetailModal({warning,onClose}){
           {msg&&<div style={{fontSize:13,color:msg.startsWith('✓')?'var(--green)':'var(--red)',marginTop:8}}>{msg}</div>}
         </div>
         <div className="modal-footer">
-          {warning.status==='active'&&!rescindMode&&<button className="btn btn-ghost btn-sm" style={{marginRight:'auto',color:'var(--muted)'}} onClick={()=>setRescindMode(true)}>Rescind Warning</button>}
+          {reviewable&&!rescindMode&&<button className="btn btn-ghost btn-sm" style={{marginRight:'auto',color:'var(--muted)'}} onClick={()=>setRescindMode(true)}>Rescind Warning</button>}
           {rescindMode?(
             <>
               <button className="btn btn-ghost" onClick={()=>setRescindMode(false)}>Cancel</button>
               <button className="btn btn-danger" onClick={rescind} disabled={busy||!rescindReason.trim()}>{busy?'...':'Confirm Rescind'}</button>
+            </>
+          ):warning.status==='submitted'?(
+            <>
+              <button className="btn btn-ghost" onClick={onClose}>Close</button>
+              <button className="btn btn-danger" onClick={confirmWarning} disabled={busy}>{busy?'...':'Confirm Warning'}</button>
             </>
           ):(
             <button className="btn btn-ghost" onClick={onClose}>Close</button>
@@ -3049,7 +3101,7 @@ function FranchiseePortal({session, profile}){
     const allW=wRows||[];
     setWarningCount(allW.length);
     const warnYearAgo=Date.now()-365*24*60*60*1000;
-    setActiveWarningCount(allW.filter(w=>w.status==='active'&&new Date(w.issued_at).getTime()>=warnYearAgo).length);
+    setActiveWarningCount(allW.filter(w=>w.status!=='rescinded'&&new Date(w.issued_at).getTime()>=warnYearAgo).length);
   },[resolveFrId]);
 
   useEffect(()=>{
@@ -3309,7 +3361,7 @@ function FranchiseeWarnings({profile,storeName}){
   useEffect(()=>{load();},[]);
 
   const oneYearAgo=new Date(Date.now()-365*24*60*60*1000);
-  const activeCount=warnings.filter(w=>w.status==='active'&&new Date(w.issued_at)>=oneYearAgo).length;
+  const activeCount=warnings.filter(w=>w.status!=='rescinded'&&new Date(w.issued_at)>=oneYearAgo).length;
   const color=activeCount>=3?'var(--red)':activeCount===2?'var(--gold)':activeCount===1?'var(--blue)':'var(--green)';
 
   return(
@@ -3344,67 +3396,102 @@ function FranchiseeWarnings({profile,storeName}){
           <div style={{color:'var(--muted)',fontSize:13,padding:'10px 0'}}>No warnings on record. Keep up the great work!</div>
         ):warnings.map(w=>{
           const expired=new Date(w.issued_at)<oneYearAgo;
+          const dl=deadlineInfo(w.deadline);
+          const preview=w.reason.length>70?w.reason.slice(0,70)+'…':w.reason;
           return(
-            <div key={w.id} onClick={()=>setSelected(w)} style={{cursor:'pointer',background:'var(--panel)',border:'1px solid var(--border)',borderLeft:`3px solid ${w.status==='rescinded'?'var(--muted2)':expired?'var(--border2)':'var(--red)'}`,borderRadius:10,padding:16,marginBottom:10,opacity:w.status==='rescinded'||expired?0.65:1,transition:'border-color .15s'}}
+            <div key={w.id} onClick={()=>setSelected(w)} style={{cursor:'pointer',background:'var(--panel)',border:'1px solid var(--border)',borderLeft:`3px solid ${w.status==='rescinded'?'var(--muted2)':w.status==='submitted'?'var(--gold)':expired?'var(--border2)':'var(--red)'}`,borderRadius:10,padding:14,marginBottom:10,opacity:w.status==='rescinded'||expired?0.65:1,transition:'border-color .15s'}}
               onMouseEnter={e=>e.currentTarget.style.borderColor='var(--border2)'} onMouseLeave={e=>e.currentTarget.style.borderColor='var(--border)'}>
               <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:6,flexWrap:'wrap',gap:6}}>
-                <div style={{display:'flex',gap:8,alignItems:'center'}}>
+                <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
                   <span style={{fontSize:11,fontWeight:700,background:'rgba(224,82,82,.15)',color:'var(--red)',padding:'2px 8px',borderRadius:999}}>{w.category}</span>
+                  {w.status==='submitted'&&<span style={{fontSize:10,color:'var(--gold)',fontWeight:700,textTransform:'uppercase'}}>● Under review</span>}
                   {w.status==='rescinded'&&<span style={{fontSize:10,color:'var(--green)',fontWeight:700,textTransform:'uppercase'}}>✓ Rescinded</span>}
-                  {expired&&w.status==='active'&&<span style={{fontSize:10,color:'var(--muted)',fontWeight:700,textTransform:'uppercase'}}>Expired</span>}
+                  {expired&&w.status!=='rescinded'&&<span style={{fontSize:10,color:'var(--muted)',fontWeight:700,textTransform:'uppercase'}}>Expired</span>}
+                  {dl&&w.status!=='rescinded'&&!expired&&<span style={{fontSize:10,fontWeight:700,color:dl.color,border:`1px solid ${dl.color}`,padding:'1px 7px',borderRadius:999}}>{dl.label}</span>}
                 </div>
                 <span style={{fontSize:11,color:'var(--muted)'}}>{new Date(w.issued_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}</span>
               </div>
-              <div style={{fontSize:13,color:'var(--text)',lineHeight:1.6,whiteSpace:'pre-wrap'}}>{w.reason}</div>
-              {w.status==='rescinded'&&w.rescinded_reason&&(
-                <div style={{fontSize:12,color:'var(--green)',marginTop:8,fontStyle:'italic'}}>Rescinded: {w.rescinded_reason}</div>
-              )}
-              <div style={{fontSize:11,color:'var(--muted2)',marginTop:10,fontWeight:600}}>View details →</div>
+              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10}}>
+                <div style={{fontSize:13,color:'var(--muted)',lineHeight:1.5,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{preview}</div>
+                <span style={{fontSize:11,color:'var(--muted2)',fontWeight:600,whiteSpace:'nowrap'}}>View →</span>
+              </div>
             </div>
           );
         })}
       </div>
-      {selected&&<FranchiseeWarningModal warning={selected} onClose={()=>setSelected(null)}/>}
+      {selected&&<FranchiseeWarningModal warning={selected} onClose={()=>setSelected(null)} onAction={load}/>}
     </>
   );
 }
 
 // ── FRANCHISEE WARNING DETAIL (read-only) ─────────────────
-function FranchiseeWarningModal({warning,onClose}){
+function FranchiseeWarningModal({warning,onClose,onAction}){
+  const [busy,setBusy]=useState(false);
+  const [msg,setMsg]=useState('');
   const oneYearAgo=new Date(Date.now()-365*24*60*60*1000);
   const expired=new Date(warning.issued_at)<oneYearAgo;
-  const isActive=warning.status==='active'&&!expired;
+  const dl=deadlineInfo(warning.deadline);
+  const canSubmit=warning.status==='active'&&!expired;
+
+  async function submitForReview(){
+    setBusy(true);setMsg('');
+    const{error}=await sb.rpc('submit_warning_for_review',{p_warning_id:warning.id});
+    setBusy(false);
+    if(error){setMsg('Error: '+error.message);return;}
+    if(onAction)onAction();
+    onClose();
+  }
+
   return(
     <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
       <div className="modal">
         <div className="modal-header">
           <div>
-            <div style={{display:'flex',gap:8,alignItems:'center',marginBottom:4}}>
+            <div style={{display:'flex',gap:8,alignItems:'center',marginBottom:4,flexWrap:'wrap'}}>
               <span style={{fontSize:11,fontWeight:700,background:'rgba(224,82,82,.15)',color:'var(--red)',padding:'2px 8px',borderRadius:999}}>{warning.category}</span>
+              {warning.status==='submitted'&&<span style={{fontSize:10,color:'var(--gold)',fontWeight:700,textTransform:'uppercase'}}>● Under review</span>}
               {warning.status==='rescinded'&&<span style={{fontSize:10,color:'var(--green)',fontWeight:700,textTransform:'uppercase'}}>✓ Rescinded</span>}
-              {expired&&warning.status==='active'&&<span style={{fontSize:10,color:'var(--muted)',fontWeight:700,textTransform:'uppercase'}}>Expired</span>}
-              {isActive&&<span style={{fontSize:10,color:'var(--red)',fontWeight:700,textTransform:'uppercase'}}>Active</span>}
+              {expired&&warning.status!=='rescinded'&&<span style={{fontSize:10,color:'var(--muted)',fontWeight:700,textTransform:'uppercase'}}>Expired</span>}
+              {canSubmit&&<span style={{fontSize:10,color:'var(--red)',fontWeight:700,textTransform:'uppercase'}}>Active</span>}
+              {dl&&warning.status!=='rescinded'&&<span style={{fontSize:10,fontWeight:700,color:dl.color,border:`1px solid ${dl.color}`,padding:'1px 7px',borderRadius:999}}>{dl.label}</span>}
             </div>
             <div className="modal-title" style={{margin:0}}>Official Warning</div>
           </div>
           <button className="close-btn" onClick={onClose}>×</button>
         </div>
         <div className="modal-body">
+          {dl&&warning.status!=='rescinded'&&(
+            <div style={{background:dl.overdue?'rgba(224,82,82,.1)':'var(--panel2)',border:`1px solid ${dl.overdue?'rgba(224,82,82,.35)':'var(--border)'}`,borderRadius:10,padding:14,marginBottom:16,display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,flexWrap:'wrap'}}>
+              <div>
+                <div style={{fontSize:11,color:'var(--muted)',textTransform:'uppercase',letterSpacing:'.06em',fontWeight:700,marginBottom:3}}>Correction Deadline</div>
+                <div style={{fontSize:14,fontWeight:700,color:'var(--text)'}}>{dl.dateStr}</div>
+              </div>
+              <div style={{fontSize:22,fontWeight:800,color:dl.color}}>{dl.label}</div>
+            </div>
+          )}
           <div style={{fontSize:11,color:'var(--muted)',marginBottom:6,textTransform:'uppercase',letterSpacing:'.06em',fontWeight:700}}>Reason</div>
           <div style={{background:'var(--panel2)',borderRadius:10,padding:16,fontSize:14,lineHeight:1.6,whiteSpace:'pre-wrap',marginBottom:16}}>{warning.reason}</div>
           <div style={{fontSize:11,color:'var(--muted2)',marginBottom:4}}>Issued by {warning.issued_by||'HQ'} on {new Date(warning.issued_at).toLocaleString('en-US',{month:'long',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'})}</div>
-          {isActive&&(
-            <div style={{fontSize:12,color:'var(--muted)',marginTop:4,lineHeight:1.5}}>This warning counts toward your active standing for 12 months from the issue date. If you believe this was issued in error, contact HQ.</div>
+          {canSubmit&&(
+            <div style={{fontSize:12,color:'var(--muted)',marginTop:8,lineHeight:1.5}}>Once you have corrected this issue, submit it for HQ review by the deadline. HQ will either rescind the warning (if resolved) or keep it on record.</div>
           )}
-          {warning.status==='rescinded'&&(
-            <div style={{background:'rgba(134,148,144,.1)',borderRadius:8,padding:12,marginTop:12}}>
-              <div style={{fontSize:10,fontWeight:700,color:'var(--muted)',textTransform:'uppercase',marginBottom:4}}>Rescinded {warning.rescinded_at?`· ${new Date(warning.rescinded_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}`:''}</div>
-              <div style={{fontSize:13,color:'var(--text)',lineHeight:1.5}}>{warning.rescinded_reason||'This warning has been rescinded by HQ.'}</div>
+          {warning.status==='submitted'&&(
+            <div style={{background:'rgba(204,156,58,.1)',border:'1px solid rgba(204,156,58,.3)',borderRadius:8,padding:12,marginTop:12}}>
+              <div style={{fontSize:13,color:'var(--gold)',fontWeight:700,marginBottom:2}}>Submitted for review{warning.submitted_at?` on ${new Date(warning.submitted_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}`:''}.</div>
+              <div style={{fontSize:12,color:'var(--muted)',lineHeight:1.5}}>HQ is reviewing your correction. You will see the outcome here once reviewed.</div>
             </div>
           )}
+          {warning.status==='rescinded'&&(
+            <div style={{background:'rgba(95,184,122,.1)',border:'1px solid rgba(95,184,122,.3)',borderRadius:8,padding:12,marginTop:12}}>
+              <div style={{fontSize:10,fontWeight:700,color:'var(--green)',textTransform:'uppercase',marginBottom:4}}>Rescinded {warning.rescinded_at?`· ${new Date(warning.rescinded_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}`:''}</div>
+              <div style={{fontSize:13,color:'var(--text)',lineHeight:1.5}}>{warning.rescinded_reason||'This warning has been rescinded by HQ. It no longer counts toward your standing, but remains on record.'}</div>
+            </div>
+          )}
+          {msg&&<div style={{fontSize:13,color:'var(--red)',marginTop:8}}>{msg}</div>}
         </div>
         <div className="modal-footer">
           <button className="btn btn-ghost" onClick={onClose}>Close</button>
+          {canSubmit&&<button className="btn btn-primary" onClick={submitForReview} disabled={busy}>{busy?'Submitting...':'Submit for Review'}</button>}
         </div>
       </div>
     </div>
