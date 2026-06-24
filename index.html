@@ -4138,8 +4138,32 @@ function FranchiseeAnnouncements({profile,onUpdate}){
 // ── UGLYBOT PORTAL ────────────────────────────────────────
 function UglyBotPortal({storeName}){
   const shellRef=React.useRef(null);
+  const [src,setSrc]=React.useState(null);
   // Embed the full UglyBot app (same one at uglybot.netlify.app) so the escalation
   // flow, HQ Questions inbox, and learning loop all work exactly as built there.
+  // Both apps share the same Supabase project, so we hand the current session to the
+  // iframe via the URL hash; UglyBot's Supabase client (detectSessionInUrl) picks it
+  // up and signs the user in automatically, so there is no second login.
+  React.useEffect(()=>{
+    (async()=>{
+      let url='https://uglybot.netlify.app/';
+      try{
+        const{data}=await sb.auth.getSession();
+        const s=data&&data.session;
+        if(s&&s.access_token&&s.refresh_token){
+          const p=new URLSearchParams({
+            access_token:s.access_token,
+            refresh_token:s.refresh_token,
+            expires_in:String(s.expires_in||3600),
+            token_type:'bearer',
+            type:'magiclink',
+          });
+          url='https://uglybot.netlify.app/#'+p.toString();
+        }
+      }catch(e){/* fall back to plain embed (manual login) */}
+      setSrc(url);
+    })();
+  },[]);
   // Size the iframe to fill from its top to the bottom of the visible viewport.
   React.useEffect(()=>{
     const vv=window.visualViewport;
@@ -4167,9 +4191,9 @@ function UglyBotPortal({storeName}){
         <div><div className="page-title">UglyBot</div><div className="page-sub">AI assistant for operations, recipes, and support</div></div>
       </div>
       <div ref={shellRef} className="bot-shell" style={{padding:0}}>
-        <iframe src="https://uglybot.netlify.app/" title="UglyBot"
+        {src&&<iframe src={src} title="UglyBot"
           style={{width:'100%',height:'100%',border:'none',display:'block',background:'var(--bg)'}}
-          allow="clipboard-write; clipboard-read; camera; microphone"/>
+          allow="clipboard-write; clipboard-read; camera; microphone"/>}
       </div>
     </>
   );
