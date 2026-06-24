@@ -3016,6 +3016,7 @@ function FranchiseePortal({session, profile}){
   const [taskCount,setTaskCount]=useState(0);
   const [announceCount,setAnnounceCount]=useState(0);
   const [warningCount,setWarningCount]=useState(0);
+  const [activeWarningCount,setActiveWarningCount]=useState(0);
   const storeName=profile?.store||profile?.full_name||profile?.name||'My Store';
 
   const resolveFrId=useCallback(async()=>{
@@ -3043,8 +3044,12 @@ function FranchiseePortal({session, profile}){
     const unconfirmed=(aRes.data||[]).filter(a=>!confirmedIds.has(a.id)).length;
     setAnnounceCount(unconfirmed);
     // Warning history: My Standing tab only appears if this store has ever received a warning.
-    const{count:wc}=await sb.from('ops_warnings').select('id',{count:'exact',head:true}).eq('franchisee_id',frId);
-    setWarningCount(wc||0);
+    // Tab visibility = ever received (warningCount). Nav badge = active warnings in last 12 months.
+    const{data:wRows}=await sb.from('ops_warnings').select('status,issued_at').eq('franchisee_id',frId);
+    const allW=wRows||[];
+    setWarningCount(allW.length);
+    const warnYearAgo=Date.now()-365*24*60*60*1000;
+    setActiveWarningCount(allW.filter(w=>w.status==='active'&&new Date(w.issued_at).getTime()>=warnYearAgo).length);
   },[resolveFrId]);
 
   useEffect(()=>{
@@ -3062,7 +3067,7 @@ function FranchiseePortal({session, profile}){
     {key:'contact',  icon:'✉', label:'Contact HQ', badge:hqReplyCount||null},
     // My Standing only shows once a store has received a warning — no need to alarm
     // franchisees in good standing who have never been warned.
-    ...(warningCount>0?[{key:'warnings', icon:'⚠', label:'My Standing'}]:[]),
+    ...(warningCount>0?[{key:'warnings', icon:'⚠', label:'My Standing', badge:activeWarningCount||null}]:[]),
     {key:'bot',      icon:'◉', label:'UglyBot'},
     {key:'password', icon:'◎', label:'Settings'},
   ];
@@ -3290,6 +3295,7 @@ function FranchiseeThreadCard({message,profile,storeName,onReplied,onSeen}){
 function FranchiseeWarnings({profile,storeName}){
   const [warnings,setWarnings]=useState([]);
   const [loading,setLoading]=useState(true);
+  const [selected,setSelected]=useState(null);
 
   async function load(){
     setLoading(true);
@@ -3339,7 +3345,8 @@ function FranchiseeWarnings({profile,storeName}){
         ):warnings.map(w=>{
           const expired=new Date(w.issued_at)<oneYearAgo;
           return(
-            <div key={w.id} style={{background:'var(--panel)',border:'1px solid var(--border)',borderLeft:`3px solid ${w.status==='rescinded'?'var(--muted2)':expired?'var(--border2)':'var(--red)'}`,borderRadius:10,padding:16,marginBottom:10,opacity:w.status==='rescinded'||expired?0.65:1}}>
+            <div key={w.id} onClick={()=>setSelected(w)} style={{cursor:'pointer',background:'var(--panel)',border:'1px solid var(--border)',borderLeft:`3px solid ${w.status==='rescinded'?'var(--muted2)':expired?'var(--border2)':'var(--red)'}`,borderRadius:10,padding:16,marginBottom:10,opacity:w.status==='rescinded'||expired?0.65:1,transition:'border-color .15s'}}
+              onMouseEnter={e=>e.currentTarget.style.borderColor='var(--border2)'} onMouseLeave={e=>e.currentTarget.style.borderColor='var(--border)'}>
               <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:6,flexWrap:'wrap',gap:6}}>
                 <div style={{display:'flex',gap:8,alignItems:'center'}}>
                   <span style={{fontSize:11,fontWeight:700,background:'rgba(224,82,82,.15)',color:'var(--red)',padding:'2px 8px',borderRadius:999}}>{w.category}</span>
@@ -3352,11 +3359,55 @@ function FranchiseeWarnings({profile,storeName}){
               {w.status==='rescinded'&&w.rescinded_reason&&(
                 <div style={{fontSize:12,color:'var(--green)',marginTop:8,fontStyle:'italic'}}>Rescinded: {w.rescinded_reason}</div>
               )}
+              <div style={{fontSize:11,color:'var(--muted2)',marginTop:10,fontWeight:600}}>View details →</div>
             </div>
           );
         })}
       </div>
+      {selected&&<FranchiseeWarningModal warning={selected} onClose={()=>setSelected(null)}/>}
     </>
+  );
+}
+
+// ── FRANCHISEE WARNING DETAIL (read-only) ─────────────────
+function FranchiseeWarningModal({warning,onClose}){
+  const oneYearAgo=new Date(Date.now()-365*24*60*60*1000);
+  const expired=new Date(warning.issued_at)<oneYearAgo;
+  const isActive=warning.status==='active'&&!expired;
+  return(
+    <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
+      <div className="modal">
+        <div className="modal-header">
+          <div>
+            <div style={{display:'flex',gap:8,alignItems:'center',marginBottom:4}}>
+              <span style={{fontSize:11,fontWeight:700,background:'rgba(224,82,82,.15)',color:'var(--red)',padding:'2px 8px',borderRadius:999}}>{warning.category}</span>
+              {warning.status==='rescinded'&&<span style={{fontSize:10,color:'var(--green)',fontWeight:700,textTransform:'uppercase'}}>✓ Rescinded</span>}
+              {expired&&warning.status==='active'&&<span style={{fontSize:10,color:'var(--muted)',fontWeight:700,textTransform:'uppercase'}}>Expired</span>}
+              {isActive&&<span style={{fontSize:10,color:'var(--red)',fontWeight:700,textTransform:'uppercase'}}>Active</span>}
+            </div>
+            <div className="modal-title" style={{margin:0}}>Official Warning</div>
+          </div>
+          <button className="close-btn" onClick={onClose}>×</button>
+        </div>
+        <div className="modal-body">
+          <div style={{fontSize:11,color:'var(--muted)',marginBottom:6,textTransform:'uppercase',letterSpacing:'.06em',fontWeight:700}}>Reason</div>
+          <div style={{background:'var(--panel2)',borderRadius:10,padding:16,fontSize:14,lineHeight:1.6,whiteSpace:'pre-wrap',marginBottom:16}}>{warning.reason}</div>
+          <div style={{fontSize:11,color:'var(--muted2)',marginBottom:4}}>Issued by {warning.issued_by||'HQ'} on {new Date(warning.issued_at).toLocaleString('en-US',{month:'long',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'})}</div>
+          {isActive&&(
+            <div style={{fontSize:12,color:'var(--muted)',marginTop:4,lineHeight:1.5}}>This warning counts toward your active standing for 12 months from the issue date. If you believe this was issued in error, contact HQ.</div>
+          )}
+          {warning.status==='rescinded'&&(
+            <div style={{background:'rgba(134,148,144,.1)',borderRadius:8,padding:12,marginTop:12}}>
+              <div style={{fontSize:10,fontWeight:700,color:'var(--muted)',textTransform:'uppercase',marginBottom:4}}>Rescinded {warning.rescinded_at?`· ${new Date(warning.rescinded_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}`:''}</div>
+              <div style={{fontSize:13,color:'var(--text)',lineHeight:1.5}}>{warning.rescinded_reason||'This warning has been rescinded by HQ.'}</div>
+            </div>
+          )}
+        </div>
+        <div className="modal-footer">
+          <button className="btn btn-ghost" onClick={onClose}>Close</button>
+        </div>
+      </div>
+    </div>
   );
 }
 
