@@ -87,7 +87,8 @@ body{font-family:'Inter',sans-serif;background:var(--black);color:var(--text);mi
 .status-approved{background:rgba(95,184,122,.15);color:var(--green);}
 .status-rejected{background:rgba(224,82,82,.15);color:var(--red);}
 /* MODAL */
-.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);display:flex;align-items:center;justify-content:center;z-index:100;padding:20px;}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);display:flex;align-items:center;justify-content:center;z-index:100;padding:20px;overscroll-behavior:contain;}
+body.modal-open{overflow:hidden;}
 .modal{background:var(--panel);border:1px solid var(--border2);border-radius:16px;width:100%;max-width:600px;max-height:92vh;overflow-y:auto;}
 .modal-lg{max-width:820px;}
 .modal-xl{max-width:1000px;}
@@ -495,11 +496,14 @@ function MainApp({view,setView,session}){
   const [pendingCount,setPendingCount]=useState(0);
   const [unreadMsgs,setUnreadMsgs]=useState(0);
   const [pendingAccounts,setPendingAccounts]=useState(0);
+  const [reviewWarnings,setReviewWarnings]=useState(0);
   const refreshBadges=useCallback(async()=>{
     const{count}=await sb.from('ops_assignments').select('id',{count:'exact',head:true}).eq('status','submitted');
     setPendingCount(count||0);
     const{count:mc}=await sb.from('ops_messages').select('id',{count:'exact',head:true}).eq('is_read',false);
     setUnreadMsgs(mc||0);
+    const{count:wc}=await sb.from('ops_warnings').select('id',{count:'exact',head:true}).eq('status','submitted');
+    setReviewWarnings(wc||0);
     // Stores open but without an Ops account yet (need HQ approval)
     const[pRes,sRes]=await Promise.all([
       sb.from('profiles').select('store').eq('role','franchisee'),
@@ -518,7 +522,7 @@ function MainApp({view,setView,session}){
     {key:'broadcast', icon:'⊕', label:'New Task'},
     {key:'announce',  icon:'◈', label:'New Announcement'},
     {key:'messages',  icon:'✉', label:'Messages', badge:unreadMsgs||null},
-    {key:'warnings',  icon:'⚠', label:'Warnings'},
+    {key:'warnings',  icon:'⚠', label:'Warnings', badge:reviewWarnings||null},
     {key:'stores',    icon:'◍', label:'Stores'},
     {key:'review',    icon:'◎', label:'HQ Review', badge:pendingCount||null},
     {key:'accounts',  icon:'◯', label:'Accounts', badge:pendingAccounts||null},
@@ -554,7 +558,7 @@ function MainApp({view,setView,session}){
         {view==='stores'&&<StoreList setView={setView}/>}
         {view==='review'&&<HQReview/>}
         {view==='messages'&&<HQMessages onBadgeRefresh={refreshBadges}/>}
-        {view==='warnings'&&<HQWarnings/>}
+        {view==='warnings'&&<HQWarnings onUpdate={refreshBadges}/>}
         {view==='password'&&<ChangePassword onDone={()=>setView('dashboard')}/>}
         {view==='accounts'&&<AccountManager onBadgeRefresh={refreshBadges}/>}
         {view==='announce'&&<Announcements/>}
@@ -602,11 +606,11 @@ function Dashboard({setView}){
       });
       setTaskStats(perTask);
 
-      // Per-announcement confirmation rates
+      // Per-announcement confirmation rates (only the stores this announcement was assigned to)
       const perAnn=anns.map(a=>{
-        const r=receipts.filter(x=>x.announcement_id===a.id&&x.confirmed);
-        const confirmed=r.length;
-        const total=stores.length;
+        const rs=receipts.filter(x=>x.announcement_id===a.id);
+        const confirmed=rs.filter(x=>x.confirmed).length;
+        const total=rs.length;
         return{...a,confirmed,total,pct:total?Math.round(confirmed/total*100):0};
       });
       setAnnounceStats(perAnn);
@@ -1677,7 +1681,7 @@ function deadlineInfo(deadline){
   return {label,color,diff,dateStr,overdue:diff<0};
 }
 
-function HQWarnings(){
+function HQWarnings({onUpdate}){
   const [stores,setStores]=useState([]);
   const [warnings,setWarnings]=useState([]);
   const [loading,setLoading]=useState(true);
@@ -1762,6 +1766,7 @@ function HQWarnings(){
                   <span style={{fontSize:11,fontWeight:700,background:'rgba(224,82,82,.15)',color:'var(--red)',padding:'2px 8px',borderRadius:999}}>{w.category}</span>
                   <span style={{fontSize:14,fontWeight:700}}>{w.store_name}</span>
                   {w.status==='submitted'&&<span style={{fontSize:10,color:'var(--gold)',fontWeight:700,textTransform:'uppercase'}}>● Submitted for review</span>}
+                  {w.status==='registered'&&<span style={{fontSize:10,color:'var(--red)',fontWeight:700,textTransform:'uppercase'}}>✓ Registered</span>}
                   {w.status==='rescinded'&&<span style={{fontSize:10,color:'var(--muted)',fontWeight:700,textTransform:'uppercase'}}>Rescinded</span>}
                   {expired&&w.status!=='rescinded'&&<span style={{fontSize:10,color:'var(--muted)',fontWeight:700,textTransform:'uppercase'}}>Expired (&gt;12mo)</span>}
                   {dl&&w.status!=='rescinded'&&!expired&&<span style={{fontSize:10,fontWeight:700,color:dl.color,border:`1px solid ${dl.color}`,padding:'1px 7px',borderRadius:999}}>{dl.label}</span>}
@@ -1774,8 +1779,8 @@ function HQWarnings(){
           );
         })}
       </div>
-      {showIssue&&<IssueWarningModal stores={stores} onClose={()=>{setShowIssue(false);load();}}/>}
-      {detail&&<WarningDetailModal warning={detail} onClose={()=>{setDetail(null);load();}}/>}
+      {showIssue&&<IssueWarningModal stores={stores} onClose={()=>{setShowIssue(false);load();if(onUpdate)onUpdate();}}/>}
+      {detail&&<WarningDetailModal warning={detail} onClose={()=>{setDetail(null);load();if(onUpdate)onUpdate();}}/>}
     </>
   );
 }
@@ -1879,7 +1884,8 @@ function WarningDetailModal({warning,onClose}){
   const [rescindMode,setRescindMode]=useState(false);
   const [rescindReason,setRescindReason]=useState('');
   const dl=deadlineInfo(warning.deadline);
-  const reviewable=warning.status==='active'||warning.status==='submitted';
+  const canRescind=warning.status!=='rescinded';
+  const canConfirm=warning.status==='submitted';
 
   async function rescind(){
     if(!rescindReason.trim()){setMsg('Please provide a reason for rescinding.');return;}
@@ -1894,7 +1900,7 @@ function WarningDetailModal({warning,onClose}){
 
   async function confirmWarning(){
     setBusy(true);setMsg('');
-    const{error}=await sb.from('ops_warnings').update({status:'active'}).eq('id',warning.id);
+    const{error}=await sb.from('ops_warnings').update({status:'registered'}).eq('id',warning.id);
     setBusy(false);
     if(error){setMsg('Error: '+error.message);return;}
     onClose();
@@ -1908,6 +1914,7 @@ function WarningDetailModal({warning,onClose}){
             <div style={{display:'flex',gap:8,alignItems:'center',marginBottom:4,flexWrap:'wrap'}}>
               <span style={{fontSize:11,fontWeight:700,background:'rgba(224,82,82,.15)',color:'var(--red)',padding:'2px 8px',borderRadius:999}}>{warning.category}</span>
               {warning.status==='submitted'&&<span style={{fontSize:10,color:'var(--gold)',fontWeight:700,textTransform:'uppercase'}}>● Submitted for review</span>}
+              {warning.status==='registered'&&<span style={{fontSize:10,color:'var(--red)',fontWeight:700,textTransform:'uppercase'}}>✓ Warning Registered</span>}
               {warning.status==='rescinded'&&<span style={{fontSize:10,color:'var(--muted)',fontWeight:700,textTransform:'uppercase'}}>Rescinded</span>}
               {dl&&warning.status!=='rescinded'&&<span style={{fontSize:10,fontWeight:700,color:dl.color,border:`1px solid ${dl.color}`,padding:'1px 7px',borderRadius:999}}>{dl.label}</span>}
             </div>
@@ -1927,13 +1934,19 @@ function WarningDetailModal({warning,onClose}){
               <div style={{fontSize:12,color:'var(--muted)',lineHeight:1.5}}>Review the correction. <strong>Confirm Warning</strong> if it was not properly resolved (warning stands), or <strong>Rescind Warning</strong> if resolved (removed from active count, record kept).</div>
             </div>
           )}
+          {warning.status==='registered'&&(
+            <div style={{background:'rgba(224,82,82,.08)',border:'1px solid rgba(224,82,82,.25)',borderRadius:8,padding:12,marginTop:12}}>
+              <div style={{fontSize:12,color:'var(--red)',fontWeight:700,marginBottom:2}}>Warning Registered.</div>
+              <div style={{fontSize:12,color:'var(--muted)',lineHeight:1.5}}>This warning was reviewed and stands as an official strike. The franchisee can no longer resubmit it. You may still rescind it if needed.</div>
+            </div>
+          )}
           {warning.status==='rescinded'&&(
             <div style={{background:'rgba(134,148,144,.1)',borderRadius:8,padding:12,marginTop:12}}>
               <div style={{fontSize:10,fontWeight:700,color:'var(--muted)',textTransform:'uppercase',marginBottom:4}}>Rescinded {warning.rescinded_at?`· ${new Date(warning.rescinded_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}`:''}</div>
               <div style={{fontSize:13,color:'var(--text)',lineHeight:1.5}}>{warning.rescinded_reason}</div>
             </div>
           )}
-          {reviewable&&rescindMode&&(
+          {canRescind&&rescindMode&&(
             <div style={{marginTop:16}}>
               <div className="form-group">
                 <label>Rescind Reason</label>
@@ -1944,13 +1957,13 @@ function WarningDetailModal({warning,onClose}){
           {msg&&<div style={{fontSize:13,color:msg.startsWith('✓')?'var(--green)':'var(--red)',marginTop:8}}>{msg}</div>}
         </div>
         <div className="modal-footer">
-          {reviewable&&!rescindMode&&<button className="btn btn-ghost btn-sm" style={{marginRight:'auto',color:'var(--muted)'}} onClick={()=>setRescindMode(true)}>Rescind Warning</button>}
+          {canRescind&&!rescindMode&&<button className="btn btn-ghost btn-sm" style={{marginRight:'auto',color:'var(--muted)'}} onClick={()=>setRescindMode(true)}>Rescind Warning</button>}
           {rescindMode?(
             <>
               <button className="btn btn-ghost" onClick={()=>setRescindMode(false)}>Cancel</button>
               <button className="btn btn-danger" onClick={rescind} disabled={busy||!rescindReason.trim()}>{busy?'...':'Confirm Rescind'}</button>
             </>
-          ):warning.status==='submitted'?(
+          ):canConfirm?(
             <>
               <button className="btn btn-ghost" onClick={onClose}>Close</button>
               <button className="btn btn-danger" onClick={confirmWarning} disabled={busy}>{busy?'...':'Confirm Warning'}</button>
@@ -3443,6 +3456,7 @@ function FranchiseeWarnings({profile,storeName}){
                 <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
                   <span style={{fontSize:11,fontWeight:700,background:'rgba(224,82,82,.15)',color:'var(--red)',padding:'2px 8px',borderRadius:999}}>{w.category}</span>
                   {w.status==='submitted'&&<span style={{fontSize:10,color:'var(--gold)',fontWeight:700,textTransform:'uppercase'}}>● Under review</span>}
+                  {w.status==='registered'&&<span style={{fontSize:10,color:'var(--red)',fontWeight:700,textTransform:'uppercase'}}>● Warning Registered</span>}
                   {w.status==='rescinded'&&<span style={{fontSize:10,color:'var(--green)',fontWeight:700,textTransform:'uppercase'}}>✓ Rescinded</span>}
                   {expired&&w.status!=='rescinded'&&<span style={{fontSize:10,color:'var(--muted)',fontWeight:700,textTransform:'uppercase'}}>Expired</span>}
                   {dl&&w.status!=='rescinded'&&!expired&&<span style={{fontSize:10,fontWeight:700,color:dl.color,border:`1px solid ${dl.color}`,padding:'1px 7px',borderRadius:999}}>{dl.label}</span>}
@@ -3488,6 +3502,7 @@ function FranchiseeWarningModal({warning,onClose,onAction}){
             <div style={{display:'flex',gap:8,alignItems:'center',marginBottom:4,flexWrap:'wrap'}}>
               <span style={{fontSize:11,fontWeight:700,background:'rgba(224,82,82,.15)',color:'var(--red)',padding:'2px 8px',borderRadius:999}}>{warning.category}</span>
               {warning.status==='submitted'&&<span style={{fontSize:10,color:'var(--gold)',fontWeight:700,textTransform:'uppercase'}}>● Under review</span>}
+              {warning.status==='registered'&&<span style={{fontSize:10,color:'var(--red)',fontWeight:700,textTransform:'uppercase'}}>● Warning Registered</span>}
               {warning.status==='rescinded'&&<span style={{fontSize:10,color:'var(--green)',fontWeight:700,textTransform:'uppercase'}}>✓ Rescinded</span>}
               {expired&&warning.status!=='rescinded'&&<span style={{fontSize:10,color:'var(--muted)',fontWeight:700,textTransform:'uppercase'}}>Expired</span>}
               {canSubmit&&<span style={{fontSize:10,color:'var(--red)',fontWeight:700,textTransform:'uppercase'}}>Active</span>}
@@ -3517,6 +3532,12 @@ function FranchiseeWarningModal({warning,onClose,onAction}){
             <div style={{background:'rgba(204,156,58,.1)',border:'1px solid rgba(204,156,58,.3)',borderRadius:8,padding:12,marginTop:12}}>
               <div style={{fontSize:13,color:'var(--gold)',fontWeight:700,marginBottom:2}}>Submitted for review{warning.submitted_at?` on ${new Date(warning.submitted_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}`:''}.</div>
               <div style={{fontSize:12,color:'var(--muted)',lineHeight:1.5}}>HQ is reviewing your correction. You will see the outcome here once reviewed.</div>
+            </div>
+          )}
+          {warning.status==='registered'&&(
+            <div style={{background:'rgba(224,82,82,.1)',border:'1px solid rgba(224,82,82,.3)',borderRadius:8,padding:12,marginTop:12}}>
+              <div style={{fontSize:13,color:'var(--red)',fontWeight:700,marginBottom:2}}>Warning Registered.</div>
+              <div style={{fontSize:12,color:'var(--muted)',lineHeight:1.5}}>HQ reviewed your submission and this warning stands as an official strike on your record. It still counts toward your standing.</div>
             </div>
           )}
           {warning.status==='rescinded'&&(
@@ -4035,6 +4056,15 @@ function UglyBotPortal({storeName}){
   );
 }
 
+
+// Lock background scroll while any modal overlay is on screen (prevents the page
+// behind a popup from scrolling, especially on mobile).
+(function(){
+  let scheduled=false;
+  const apply=()=>{scheduled=false;document.body.classList.toggle('modal-open',!!document.querySelector('.modal-overlay'));};
+  const mo=new MutationObserver(()=>{if(!scheduled){scheduled=true;requestAnimationFrame(apply);}});
+  mo.observe(document.body,{childList:true,subtree:true});
+})();
 
 ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
 </script>
