@@ -1,10 +1,30 @@
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 const SUPA_URL = 'https://ciufbbdzekqlqdzodnrr.supabase.co';
 const SUPA_KEY = 'sb_publishable_26hdkwY53clveH7bDPf21w_JGtrY1NP';
+const ALLOWED_ORIGINS = ['https://uglyops.netlify.app', 'https://uglycrm.netlify.app', 'https://uglybot.netlify.app'];
+function cors(event) {
+  const o = (event.headers && (event.headers.origin || event.headers.Origin)) || '';
+  const allow = ALLOWED_ORIGINS.includes(o) ? o : ALLOWED_ORIGINS[0];
+  return { 'Access-Control-Allow-Origin': allow, 'Access-Control-Allow-Headers': 'Content-Type, Authorization', 'Access-Control-Allow-Methods': 'POST, OPTIONS', 'Vary': 'Origin', 'Content-Type': 'application/json' };
+}
+async function getCaller(event) {
+  const h = event.headers || {};
+  const token = String(h.authorization || h.Authorization || '').replace(/^Bearer\s+/i, '').trim();
+  if (!token || token === SUPA_KEY) return null;
+  try {
+    const r = await fetch(`${SUPA_URL}/auth/v1/user`, { headers: { apikey: SUPA_KEY, Authorization: `Bearer ${token}` } });
+    if (!r.ok) return null;
+    return await r.json();
+  } catch (e) { return null; }
+}
 
 exports.handler = async (event) => {
-  if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers: corsHeaders(), body: '' };
-  if (event.httpMethod !== 'POST') return { statusCode: 405, body: 'Method Not Allowed' };
+  if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers: cors(event), body: '' };
+  if (event.httpMethod !== 'POST') return { statusCode: 405, headers: cors(event), body: JSON.stringify({ error: 'Method Not Allowed' }) };
+
+  // Require any authenticated user (blocks anonymous abuse of the AI proxy).
+  const caller = await getCaller(event);
+  if (!caller) return { statusCode: 401, headers: cors(event), body: JSON.stringify({ error: 'Authentication required' }) };
 
   try {
     const { messages, store, photoBase64, photoType } = JSON.parse(event.body);
@@ -86,23 +106,15 @@ If the knowledge base has a relevant answer, use it. If you don't know something
 
     const data = await res.json();
     if (!res.ok) {
-      return { statusCode: 500, headers: corsHeaders(), body: JSON.stringify({ error: data.error?.message || 'API error' }) };
+      return { statusCode: 500, headers: cors(event), body: JSON.stringify({ error: data.error?.message || 'API error' }) };
     }
 
     return {
       statusCode: 200,
-      headers: corsHeaders(),
+      headers: cors(event),
       body: JSON.stringify({ content: data.content?.[0]?.text || 'Sorry, I could not generate a response.' }),
     };
   } catch (err) {
-    return { statusCode: 500, headers: corsHeaders(), body: JSON.stringify({ error: err.message }) };
+    return { statusCode: 500, headers: cors(event), body: JSON.stringify({ error: err.message }) };
   }
 };
-
-function corsHeaders() {
-  return {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type',
-    'Content-Type': 'application/json',
-  };
-}
