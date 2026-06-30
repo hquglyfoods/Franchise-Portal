@@ -239,9 +239,18 @@ const AI_FN = '/.netlify/functions/chat';
 const CREATE_ACCOUNT_FN = '/.netlify/functions/create-account';
 const RESET_PW_FN = '/.netlify/functions/reset-password';
 
+// Privileged Netlify functions require the caller's session token so they can
+// verify the caller is a logged-in HQ user. This injects it on every call.
+async function authFetch(url, opts={}){
+  let token = SUPA_KEY;
+  try{ const {data}=await sb.auth.getSession(); if(data&&data.session&&data.session.access_token) token=data.session.access_token; }catch(e){}
+  const headers = Object.assign({}, opts.headers||{}, {'Authorization':'Bearer '+token});
+  return fetch(url, Object.assign({}, opts, {headers}));
+}
+
 async function sendEmail(to, subject, html){
   try{
-    const res = await fetch(EMAIL_FN, {
+    const res = await authFetch(EMAIL_FN, {
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body: JSON.stringify({to, subject, html}),
@@ -2014,7 +2023,7 @@ function IssueWarningModal({stores,onClose}){
     // Official email notification to franchisee
     if(store?.email){
       try{
-        await fetch(EMAIL_FN,{
+        await authFetch(EMAIL_FN,{
           method:'POST',headers:{'Content-Type':'application/json'},
           body:JSON.stringify({
             to:store.email,
@@ -2325,7 +2334,7 @@ function HQMessageDetail({message,onClose}){
         frEmail=fr?.email;
       }
       if(frEmail){
-        await fetch(EMAIL_FN,{
+        await authFetch(EMAIL_FN,{
           method:'POST',headers:{'Content-Type':'application/json'},
           body:JSON.stringify({
             to:frEmail,
@@ -2418,7 +2427,7 @@ function HQNewMessageModal({onClose}){
     // Email franchisee
     if(store?.email){
       try{
-        await fetch(EMAIL_FN,{
+        await authFetch(EMAIL_FN,{
           method:'POST',headers:{'Content-Type':'application/json'},
           body:JSON.stringify({
             to:store.email,
@@ -2598,7 +2607,7 @@ function AccountManager({onBadgeRefresh}){
     if(!window.confirm(`Send a password reset email to ${email}?\nThe franchisee will get a link to set a new password.`))return;
     // Send via Resend (reliable). Fall back to Supabase built-in mailer if the function fails.
     try{
-      const res=await fetch(RESET_PW_FN,{
+      const res=await authFetch(RESET_PW_FN,{
         method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({email,name:m.full_name||m.name||''}),
       });
@@ -2624,7 +2633,7 @@ function AccountManager({onBadgeRefresh}){
     setBusy(s.id);
     const storeName=s.store_name||s.name||'';
     try{
-      const res=await fetch(CREATE_ACCOUNT_FN,{
+      const res=await authFetch(CREATE_ACCOUNT_FN,{
         method:'POST',
         headers:{'Content-Type':'application/json'},
         body:JSON.stringify({email,storeName,franchiseeId:s.id}),
@@ -3498,7 +3507,7 @@ function NewMessageModal({profile,storeName,onClose,onSent}){
     }]);
     if(error){setMsg('Error: '+error.message);setBusy(false);return;}
     try{
-      await fetch(EMAIL_FN,{
+      await authFetch(EMAIL_FN,{
         method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({
           to:'hq@uglydonutsncorndogs.com',
@@ -3573,7 +3582,7 @@ function FranchiseeThreadModal({message,profile,storeName,onClose,onSeen}){
     if(error){setBusy(false);return;}
     await sb.from('ops_messages').update({is_read:false,status:'open',last_sender_role:'franchisee'}).eq('id',message.id);
     try{
-      await fetch(EMAIL_FN,{
+      await authFetch(EMAIL_FN,{
         method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({
           to:'hq@uglydonutsncorndogs.com',
