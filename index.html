@@ -457,7 +457,7 @@ function App(){
   const [session,setSession]=useState(null);
   const [profile,setProfile]=useState(null);
   const [loading,setLoading]=useState(true);
-  const [view,setView]=useState('dashboard');
+  const [view,setView]=useState(()=>location.hash==='#install'?'password':'dashboard');
   const [recoveryMode,setRecoveryMode]=useState(false);
   const [linkError,setLinkError]=useState('');
 
@@ -634,6 +634,27 @@ function InstallBanner(){
   );
 }
 
+
+// Self-install button (Accounts toolbar): install this device, or show status.
+function InstallAppBtn(){
+  const[,force]=React.useReducer(x=>x+1,0);
+  const[guide,setGuide]=React.useState(false);
+  React.useEffect(()=>{const f=()=>force();window.addEventListener('pwa-ready',f);return()=>window.removeEventListener('pwa-ready',f);},[]);
+  if(isStandalone())return <span className="btn btn-ghost btn-sm" style={{whiteSpace:'nowrap',color:'var(--green)',borderColor:'rgba(95,184,122,.35)',cursor:'default'}}>✓ Already installed</span>;
+  if(window._pwaPrompt)return <button type="button" className="btn btn-gold btn-sm" style={{whiteSpace:'nowrap'}} onClick={async()=>{try{window._pwaPrompt.prompt();await window._pwaPrompt.userChoice;}catch(e){}force();}}>Install app</button>;
+  return(
+    <span style={{position:'relative',display:'inline-flex'}}>
+      <button type="button" className="btn btn-ghost btn-sm" style={{whiteSpace:'nowrap'}} onClick={()=>setGuide(g=>!g)}>Install app</button>
+      {guide&&(
+        <span style={{position:'absolute',top:'110%',left:0,zIndex:40,background:'var(--panel)',border:'1px solid var(--border2)',borderRadius:8,padding:'10px 12px',fontSize:12,color:'var(--muted)',width:260,lineHeight:1.6,boxShadow:'0 8px 24px rgba(0,0,0,.4)'}}>
+          {isIOS()
+            ?<>iPhone/iPad: open in <b style={{color:'var(--text)'}}>Safari</b> → Share ⬆︎ → <b style={{color:'var(--text)'}}>"Add to Home Screen"</b>.</>
+            :<>Open this site in <b style={{color:'var(--text)'}}>Chrome</b> to install. If you already installed it, launch it from your desktop or home screen instead of the browser.</>}
+        </span>
+      )}
+    </span>
+  );
+}
 
 // Copies the mobile install deep-link (login screen auto-opens the install guide).
 function CopyInstallLinkBtn({label}){
@@ -2891,8 +2912,8 @@ function AccountManager({onBadgeRefresh}){
             <span style={{background:'var(--red)',color:'#fff',fontSize:11,fontWeight:800,borderRadius:10,minWidth:20,height:20,display:'inline-flex',alignItems:'center',justifyContent:'center',padding:'0 6px'}}>{unregistered.length}</span>
           </button>
         )}
-        {/* Mobile app install link: copy & send to any user */}
-        <div style={{marginBottom:16,display:'inline-flex'}}><CopyInstallLinkBtn label="📲 App install link"/></div>
+        {/* Mobile app install: copy link for others / install this device */}
+        <div style={{marginBottom:16,display:'inline-flex',gap:8,flexWrap:'wrap'}}><CopyInstallLinkBtn label="📲 App install link"/><InstallAppBtn/></div>
 
         {/* Account list */}
         <input value={acctSearch} onChange={e=>setAcctSearch(e.target.value)} placeholder="Search name, store, role..."
@@ -3494,7 +3515,7 @@ function ChangePassword({onDone}){
 
 // ── FRANCHISEE PORTAL ────────────────────────────────────
 function FranchiseePortal({session, profile}){
-  const [portalView,setPortalView]=useState('tasks');
+  const [portalView,setPortalView]=useState(()=>location.hash==='#install'?'password':'tasks');
   const [botOpen,setBotOpen]=useState(false);
   const [hqReplyCount,setHqReplyCount]=useState(0);
   const [taskCount,setTaskCount]=useState(0);
