@@ -16,7 +16,7 @@ self.addEventListener('push', e => {
     badge: '/icons/badge-96.png',
     tag: data.tag || 'ugly-portal',
     renotify: true,
-    data: { url: '/' }
+    data: { url: (data.data && data.data.url) || '/' }
   };
   const work = [self.registration.showNotification(title, opts)];
   if (typeof data.badge === 'number' && self.navigator.setAppBadge) {
@@ -27,10 +27,17 @@ self.addEventListener('push', e => {
 
 self.addEventListener('notificationclick', e => {
   e.notification.close();
+  const url = (e.notification.data && e.notification.data.url) || '/';
   e.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
-      for (const c of list) { if ('focus' in c) return c.focus(); }
-      return clients.openWindow('/');
+      for (const c of list) {
+        if ('focus' in c) {
+          c.focus();
+          if ('navigate' in c && url !== '/') return c.navigate(url).catch(()=>{});
+          return;
+        }
+      }
+      return clients.openWindow(url);
     })
   );
 });

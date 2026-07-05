@@ -101,7 +101,7 @@ exports.handler = async (event) => {
       const tasks = await restJson(`ops_tasks?id=eq.${record.ops_task_id}&select=title`);
       const title = tasks[0] ? tasks[0].title : 'a new task';
       sent = await fanout(subs, async () => ({
-        title: 'New task assigned', body: title, tag: 'task-' + record.id, badge,
+        title: 'New task assigned', body: title, tag: 'task-' + record.id, badge, data: { url: '/#open=tasks' },
       }));
     }
 
@@ -117,7 +117,7 @@ exports.handler = async (event) => {
       const store = frs[0] ? (frs[0].store_name || frs[0].name) : 'A store';
       const title = tasks[0] ? tasks[0].title : 'a task';
       sent = await fanout(subs, async () => ({
-        title: 'Submitted for review', body: `${store}: ${title}`, tag: 'review-' + record.id, badge,
+        title: 'Submitted for review', body: `${store}: ${title}`, tag: 'review-' + record.id, badge, data: { url: '/#open=review&id=' + record.id },
       }));
     }
 
@@ -125,7 +125,7 @@ exports.handler = async (event) => {
     else if (table === 'ops_announcements' && type === 'INSERT' && record.status === 'active') {
       const subs = await subsForAllFranchisees();
       sent = await fanout(subs, async (s) => ({
-        title: 'New announcement', body: record.title || '', tag: 'ann-' + record.id,
+        title: 'New announcement', body: record.title || '', tag: 'ann-' + record.id, data: { url: '/#open=announce' },
         badge: s.franchisee_id ? await frBadge(s.franchisee_id) : undefined,
       }));
     }
@@ -136,7 +136,7 @@ exports.handler = async (event) => {
       const badge = await hqBadge();
       sent = await fanout(subs, async () => ({
         title: `Message from ${record.store_name || 'a store'}`,
-        body: record.subject || record.topic || '', tag: 'msg-' + record.id, badge,
+        body: record.subject || record.topic || '', tag: 'msg-' + record.id, badge, data: { url: '/#open=messages' },
       }));
     }
 
@@ -149,13 +149,13 @@ exports.handler = async (event) => {
           const subs = await subsForFranchisee(msg.franchisee_id);
           const badge = await frBadge(msg.franchisee_id);
           sent = await fanout(subs, async () => ({
-            title: 'HQ replied', body: msg.subject || '', tag: 'reply-' + record.message_id, badge,
+            title: 'HQ replied', body: msg.subject || '', tag: 'reply-' + record.message_id, badge, data: { url: '/#open=contact' },
           }));
         } else {
           const subs = await subsForHQ();
           const badge = await hqBadge();
           sent = await fanout(subs, async () => ({
-            title: `Reply from ${msg.store_name || 'a store'}`, body: msg.subject || '', tag: 'reply-' + record.message_id, badge,
+            title: `Reply from ${msg.store_name || 'a store'}`, body: msg.subject || '', tag: 'reply-' + record.message_id, badge, data: { url: '/#open=messages' },
           }));
         }
       }
@@ -169,7 +169,7 @@ exports.handler = async (event) => {
       sent = await fanout(subs, async () => ({
         title: 'Warning issued by HQ',
         body: [record.category, reason].filter(Boolean).join(': ') || 'Please review and respond in the portal.',
-        tag: 'warn-' + record.id, badge,
+        tag: 'warn-' + record.id, badge, data: { url: '/#open=warnings' },
       }));
     }
   } catch (e) {

@@ -1,0 +1,2639 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Ugly Donuts — Franchise OS</title>
+<script src="https://unpkg.com/react@18.3.1/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone@7.26.4/babel.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,700;1,600&display=swap');
+:root {
+  /* Hybrid: light workspace */
+  --gold:#B8860B;--gold-light:#8A6614;--gold-dim:#8A6614;
+  --black:#F5F1E8;--dark:#EFE9DB;--panel:#FFFFFF;--panel2:#FAF7F0;
+  --border:#E9E2D2;--border2:#D9D0BA;--text:#202623;
+  --muted:#635D4E;--muted2:#8B8470;
+  --red:#BE4A3E;--green:#2E7D4F;--blue:#2C5F9E;--orange:#B5561F;
+  --grade-high:#2E7D4F;--grade-mid:#B5861F;--grade-low:#9A937F;
+  --ink:#14201E;--ink-gold:#F0D68A;--shadow:0 1px 3px rgba(30,25,15,.06);
+  --line-soft:#F2EDE1;--thead:#FAF7F0;
+}
+/* Dark chrome: sidebar + auth keep brand */
+.sidebar,.auth-wrap{
+  --gold:#E3BE64;--panel:#1E2A22;--panel2:#26332A;--border:#2E3B33;--border2:#3A473E;
+  --text:#F0EDE8;--muted:#93A19A;--muted2:#5E6B66;--red:#E05252;--green:#5FB87A;
+flex-direction:column;background:linear-gradient(180deg,#0C1A19,#0A1514);}
+*{box-sizing:border-box;margin:0;padding:0;}
+.tabbar{display:none;}
+body{font-family:'Inter',sans-serif;background:#F5F1E8;color:var(--text);min-height:100vh;font-size:14px;}
+/* AUTH */
+.auth-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;}
+.auth-card{width:380px;background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:40px;}
+.auth-logo{font-family:'Playfair Display',serif;font-size:22px;color:var(--gold);margin-bottom:4px;}
+.auth-sub{color:var(--orange);font-weight:600;font-size:13px;margin-bottom:32px;}
+.auth-card label{display:block;color:var(--muted);font-size:12px;font-weight:500;letter-spacing:.05em;text-transform:uppercase;margin-bottom:6px;}
+.auth-card input{width:100%;background:var(--panel2);border:1px solid var(--border2);border-radius:8px;padding:10px 14px;color:var(--text);font-size:14px;font-family:inherit;outline:none;margin-bottom:16px;transition:border-color .2s;}
+.auth-card input:focus{border-color:var(--gold);}
+.btn-gold{width:100%;background:var(--gold);color:var(--black);border:none;border-radius:8px;padding:12px;font-size:14px;font-weight:600;font-family:inherit;cursor:pointer;transition:opacity .2s;}
+.btn-gold:hover{opacity:.85;}
+.auth-err{color:var(--red);font-size:13px;margin-top:12px;text-align:center;}
+/* LAYOUT */
+.app{display:flex;min-height:100vh;}
+.sidebar{width:220px;min-height:100vh;background:linear-gradient(180deg,#0C1A19 0%,#0A1514 100%);border-right:none;box-shadow:4px 0 18px rgba(15,25,20,.10);display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow-y:auto;flex-shrink:0;}
+.sidebar-logo{padding:24px 20px 20px;border-bottom:1px solid var(--border);}
+.sidebar-logo .brand{font-family:'Playfair Display',serif;font-size:15px;color:var(--gold);}
+.sidebar-logo .subbrand{font-size:11px;color:var(--orange);font-weight:700;letter-spacing:.08em;text-transform:uppercase;margin-top:2px;}
+.nav{padding:12px 8px;flex:1;}
+.nav-section{font-size:10px;color:var(--muted2);letter-spacing:.1em;text-transform:uppercase;padding:12px 12px 6px;}
+.nav-item{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:8px;cursor:pointer;color:var(--muted);font-size:13px;font-weight:500;transition:all .15s;margin-bottom:2px;background:none;border:none;width:100%;text-align:left;font-family:inherit;}
+.nav-item:hover{background:var(--panel2);color:var(--text);}
+.nav-item.active{background:rgba(204,156,58,.12);color:var(--gold);}
+.nav-icon{font-size:16px;width:20px;text-align:center;}
+.nav-badge{margin-left:auto;background:var(--red);color:#fff;border-radius:999px;font-size:10px;font-weight:700;padding:1px 6px;min-width:18px;text-align:center;}
+.sidebar-footer{padding:16px;border-top:1px solid var(--border);font-size:12px;color:var(--muted);}
+.sidebar-footer button{background:none;border:none;color:var(--muted);cursor:pointer;font-size:12px;font-family:inherit;padding:0;transition:color .2s;}
+.sidebar-footer button:hover{color:var(--red);}
+.main{flex:1;min-width:0;}
+.page-header{padding:28px 32px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:var(--panel);position:sticky;top:0;z-index:10;}
+.page-title{font-size:20px;font-weight:700;}
+.page-sub{font-size:13px;color:var(--muted);margin-top:2px;}
+.content{padding:24px 32px;}
+/* BUTTONS */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:8px;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer;border:none;transition:all .15s;}
+.btn-primary{background:var(--gold);color:var(--black);}
+.btn-primary:hover{opacity:.85;}
+.btn-ghost{background:transparent;color:var(--muted);border:1px solid var(--border2);}
+.btn-ghost:hover{background:var(--panel2);color:var(--text);}
+.btn-danger{background:rgba(224,82,82,.15);color:var(--red);border:1px solid rgba(224,82,82,.3);}
+.btn-sm{padding:5px 12px;font-size:12px;border-radius:6px;}
+/* CARDS */
+.card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:20px;}
+.card-grid{display:grid;gap:16px;}
+.card-grid-2{grid-template-columns:repeat(2,1fr);}
+.card-grid-3{grid-template-columns:repeat(3,1fr);}
+.card-grid-4{grid-template-columns:repeat(4,1fr);}
+/* STATS */
+.stat-label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px;}
+.stat-value{font-size:28px;font-weight:700;}
+.stat-value.gold{color:var(--gold);}
+.stat-sub{font-size:12px;color:var(--muted);margin-top:4px;}
+/* BADGES */
+.badge{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:600;}
+.badge-high{background:#E8F4EC;color:var(--grade-high);}
+.badge-mid{background:#F7EEDA;color:var(--grade-mid);}
+.badge-low{background:#EEEAE0;color:var(--grade-low);}
+.pcell{display:flex;align-items:center;gap:10px;}
+.pava{width:30px;height:30px;border-radius:50%;font-size:11px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;flex:none;}
+.pava-0{background:#E8F0FA;color:#2C5F9E;}.pava-1{background:#F7EEDA;color:#8A6614;}.pava-2{background:#E8F4EC;color:#2E7D4F;}.pava-3{background:#F4E8F0;color:#8A4A6E;}
+.badge-gold{background:rgba(204,156,58,.15);color:var(--gold);}
+.badge-green{background:rgba(95,184,122,.15);color:var(--green);}
+.badge-red{background:rgba(224,82,82,.15);color:var(--red);}
+.badge-blue{background:rgba(91,143,212,.15);color:var(--blue);}
+.owner-badge{display:inline-flex;align-items:center;padding:2px 7px;border-radius:4px;font-size:10px;font-weight:700;letter-spacing:.05em;}
+.owner-CEO{background:rgba(204,156,58,.2);color:#CC9C3A;}
+.owner-COO{background:rgba(95,184,122,.2);color:#5FB87A;}
+.owner-CMO{background:rgba(217,138,160,.2);color:#D98AA0;}
+.owner-CBO{background:rgba(143,168,217,.2);color:#8FA8D9;}
+.owner-CPO{background:rgba(199,160,106,.2);color:#C7A06A;}
+.owner-FRANCHISEE{background:rgba(126,200,200,.2);color:#7EC8C8;}
+.stage-pill{display:inline-block;padding:3px 10px;border-radius:999px;font-size:11px;font-weight:600;}
+/* TABLE */
+.table-wrap{overflow-x:auto;border-radius:12px;border:1px solid var(--border);}
+table{width:100%;border-collapse:collapse;}
+thead th{background:var(--panel2);padding:10px 16px;text-align:left;font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid var(--border);}
+tbody tr{border-bottom:1px solid var(--border);transition:background .1s;}
+tbody tr:last-child{border-bottom:none;}
+tbody tr:hover{background:rgba(255,255,255,.02);}
+td{padding:12px 16px;font-size:13px;vertical-align:middle;}
+/* MODAL */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);display:flex;align-items:center;justify-content:center;z-index:100;padding:20px;}
+.modal{background:var(--panel);border:1px solid var(--border2);border-radius:16px;width:100%;max-width:560px;max-height:90vh;overflow-y:auto;}
+.modal-lg{max-width:800px;}
+.modal-xl{max-width:1000px;}
+.modal-header{padding:20px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+.modal-title{font-size:16px;font-weight:700;}
+.modal-body{padding:20px 24px;}
+.modal-footer{padding:16px 24px;border-top:1px solid var(--border);display:flex;gap:10px;justify-content:flex-end;}
+.close-btn{background:none;border:none;color:var(--muted);cursor:pointer;font-size:20px;line-height:1;padding:0 4px;}
+.close-btn:hover{color:var(--text);}
+/* FORM */
+.form-group{margin-bottom:16px;}
+.form-group label{display:block;font-size:12px;font-weight:500;color:var(--muted);letter-spacing:.05em;text-transform:uppercase;margin-bottom:6px;}
+.form-group input,.form-group select,.form-group textarea{width:100%;background:var(--panel2);border:1px solid var(--border2);border-radius:8px;padding:9px 12px;color:var(--text);font-size:14px;font-family:inherit;outline:none;transition:border-color .2s;}
+.form-group input:focus,.form-group select:focus,.form-group textarea:focus{border-color:var(--gold);}
+.form-group textarea{resize:vertical;min-height:80px;}
+.form-group select option{background:var(--panel2);}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+/* PROGRESS */
+.progress-bar{height:6px;background:var(--border);border-radius:999px;overflow:hidden;}
+.progress-fill{height:100%;background:var(--gold);border-radius:999px;transition:width .3s;}
+/* CALENDAR */
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;}
+.cal-header-cell{text-align:center;font-size:11px;font-weight:600;color:var(--muted);padding:8px 4px;text-transform:uppercase;letter-spacing:.06em;}
+.cal-cell{min-height:80px;background:var(--panel2);border-radius:6px;padding:6px;border:1px solid var(--border);position:relative;}
+.cal-cell.today{border-color:var(--gold);}
+.cal-cell.other-month{opacity:.35;}
+.cal-day-num{font-size:12px;font-weight:600;margin-bottom:4px;color:var(--muted);}
+.cal-cell.today .cal-day-num{color:var(--gold);}
+.cal-event{font-size:10px;padding:2px 5px;border-radius:3px;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;}
+.cal-count-badge{display:none;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 5px;border-radius:9px;color:#0E0E0E;font-size:10px;font-weight:800;}
+.cal-day-modal{display:none;}
+/* FOLLOWUP */
+.followup-item{display:flex;align-items:center;gap:12px;padding:12px 16px;border-radius:8px;border:1px solid var(--border);margin-bottom:8px;background:var(--panel);}
+.followup-date{text-align:center;min-width:48px;background:var(--panel2);border-radius:8px;padding:6px 8px;}
+.followup-date .day{font-size:20px;font-weight:700;color:var(--gold);line-height:1;}
+.followup-date .mon{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;}
+.followup-overdue .followup-date .day{color:var(--red);}
+.followup-body{flex:1;}
+.followup-title{font-size:13px;font-weight:600;}
+.followup-lead{font-size:12px;color:var(--muted);margin-top:2px;}
+.followup-time{font-size:11px;color:var(--muted2);margin-top:2px;}
+/* FRANCHISEE CARD */
+.franchisee-card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:18px;cursor:pointer;transition:border-color .2s;}
+.franchisee-card:hover{border-color:var(--gold-dim);}
+/* TASK */
+.task-item{display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);}
+.task-item:last-child{border-bottom:none;}
+.task-check{width:18px;height:18px;border-radius:4px;border:1.5px solid var(--border2);background:var(--panel2);flex-shrink:0;cursor:pointer;display:flex;align-items:center;justify-content:center;margin-top:1px;transition:all .15s;}
+.task-check.done{background:var(--gold);border-color:var(--gold);}
+.task-check.done::after{content:'✓';font-size:11px;color:var(--black);font-weight:700;}
+.task-title{font-size:13px;flex:1;line-height:1.4;}
+.task-title.done{text-decoration:line-through;color:var(--muted);}
+/* ACTIVITY */
+.activity-item{display:flex;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);}
+.activity-item:last-child{border-bottom:none;}
+.activity-dot{width:8px;height:8px;border-radius:50%;background:var(--gold);flex-shrink:0;margin-top:4px;}
+/* SETTINGS */
+.settings-phase{background:var(--panel2);border:1px solid var(--border);border-radius:10px;margin-bottom:12px;}
+.settings-phase-header{padding:14px 16px;display:flex;align-items:center;gap:10px;cursor:pointer;}
+.settings-phase-tasks{padding:0 16px 16px;}
+.settings-task-row{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border);}
+.settings-task-row:last-child{border-bottom:none;}
+.inline-input{background:transparent;border:none;outline:none;color:var(--text);font-size:13px;font-family:inherit;flex:1;padding:2px 0;border-bottom:1px solid transparent;transition:border-color .2s;}
+.inline-input:focus{border-bottom-color:var(--gold);}
+/* TABS */
+.tab-bar{display:flex;border-bottom:1px solid var(--border);padding:0 24px;}
+.tab-btn{background:none;border:none;padding:12px 16px;cursor:pointer;font-family:inherit;font-size:13px;color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .15s;}
+.tab-btn.active{color:var(--gold);font-weight:700;border-bottom-color:var(--gold);}
+/* EMPTY */
+.empty{text-align:center;padding:60px 20px;color:var(--muted);}
+.empty-icon{font-size:40px;margin-bottom:12px;}
+.empty-title{font-size:16px;font-weight:600;color:var(--text);margin-bottom:6px;}
+/* FILTER */
+.filter-bar{display:flex;gap:10px;align-items:center;margin-bottom:20px;flex-wrap:wrap;}
+.filter-bar input,.filter-bar select{background:var(--panel);border:1px solid var(--border2);border-radius:8px;padding:8px 12px;color:var(--text);font-size:13px;font-family:inherit;outline:none;}
+.filter-bar input:focus,.filter-bar select:focus{border-color:var(--gold);}
+.loading{display:flex;align-items:center;justify-content:center;padding:60px;color:var(--muted);}
+.due-soon{color:var(--orange);font-weight:600;}
+.overdue-tag{color:var(--red);font-weight:700;font-size:11px;}
+::-webkit-scrollbar{width:6px;height:6px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px;}
+
+/* ===== MOBILE RESPONSIVE ===== */
+@media (max-width:768px){
+  /* ===== app-shell mobile: table -> cards + bottom tab bar ===== */
+  .main{padding-bottom:74px;}
+  .page-header{background:var(--ink);border-bottom:none;}
+  .page-header .page-title{color:#F2EFE7;}
+  .page-header .page-sub{color:#93A19A;}
+  .table-wrap{overflow:visible;border:none;background:none;}
+  .table-wrap table{min-width:0;}
+  .table-wrap table,.table-wrap thead,.table-wrap tbody,.table-wrap tr,.table-wrap td,.table-wrap th{display:block;}
+  .table-wrap thead{display:none;}
+  .table-wrap tbody tr{background:var(--panel);border:1px solid var(--border);border-radius:13px;box-shadow:var(--shadow);padding:14px;margin-bottom:10px;}
+  .table-wrap tbody tr:hover td{background:none;}
+  .table-wrap td{border:none!important;padding:0;display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:30px;text-align:right;overflow-wrap:anywhere;word-break:break-word;}
+  .table-wrap td:not(:first-child){margin-top:8px;padding-top:8px;border-top:1px solid var(--line-soft)!important;}
+  .table-wrap td::before{content:attr(data-label);font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted2);font-weight:700;flex:none;text-align:left;}
+  .table-wrap td:empty{display:none;}
+  .table-wrap td .pcell{width:100%;}
+  .tabbar{display:flex;position:fixed;bottom:0;left:0;right:0;background:var(--panel);border-top:1px solid var(--border);padding:8px 4px calc(8px + env(safe-area-inset-bottom));z-index:60;}
+  .tb{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;color:var(--muted2);font-size:9.5px;font-weight:700;border:none;background:none;font-family:inherit;position:relative;cursor:pointer;padding:2px 0;min-width:0;}
+  .tb svg{width:22px;height:22px;}
+  .tb.on{color:var(--text);}
+  .tb.on svg{color:var(--gold-dim);}
+  .tb .tbadge{position:absolute;top:-2px;right:calc(50% - 18px);background:var(--red);color:#fff;font-size:8.5px;font-weight:800;min-width:15px;height:15px;border-radius:8px;display:flex;align-items:center;justify-content:center;padding:0 4px;}
+  body{overscroll-behavior-y:contain;}
+  /* tabbar duplicates hidden from top grid */
+  .nav-item[data-navkey="dashboard"],.nav-item[data-navkey="board"],.nav-item[data-navkey="followups"],
+  .nav-item[data-navkey="leads"],.nav-item[data-navkey="calendar"]{display:none!important;}
+
+  html,body{overflow-x:hidden;max-width:100%;}
+  .app{flex-direction:column;}
+  .sidebar{width:100%;height:auto;min-height:0;position:static;flex-direction:column;border-right:none;border-bottom:1px solid var(--border);padding-top:env(safe-area-inset-top);}
+  .sidebar-logo{padding:12px 16px 8px;}
+  /* nav becomes a button grid (app-like), not a scrolling tab row */
+  .sidebar .nav{display:grid!important;grid-template-columns:repeat(3,1fr);gap:7px;padding:8px 12px;overflow:visible;flex:none;}
+  .nav-item{position:relative;display:flex;align-items:center;justify-content:center;text-align:center;white-space:normal;line-height:1.15;width:auto!important;min-height:34px;padding:5px 6px;font-size:12px;font-weight:600;border:1px solid var(--border2)!important;border-radius:9px;background:var(--panel2);margin:0!important;}
+  .nav-item:hover{background:var(--panel2);}
+  .nav-item.active{background:rgba(204,156,58,.15);border-color:var(--gold)!important;color:var(--gold-light);}
+  .nav-icon{display:none!important;}
+  .sidebar-footer{flex-direction:row;flex-wrap:wrap;overflow-x:auto;}
+  .main{width:100%;max-width:100%;overflow-x:hidden;}
+  /* drop the per-screen title/subtitle cards; keep any action controls */
+  .page-header{padding:8px 16px;min-height:0;flex-wrap:wrap;gap:8px;position:static;}
+  .page-header .page-title,.page-header .page-sub{display:none!important;}
+  .page-header:not(:has(button)):not(:has(a)):not(:has(input)):not(:has(select)):not(:has(.btn)):not(:has([role="button"])){display:none!important;padding:0!important;border:none!important;}
+  .content{padding:16px;max-width:100%;overflow-x:hidden;}
+  .form-row{grid-template-columns:1fr!important;}
+  .card{padding:16px!important;max-width:100%;}
+  /* stack every multi-column grid so panels never squish on a phone */
+  .card-grid-2{grid-template-columns:1fr!important;}
+  .card-grid-3{grid-template-columns:1fr!important;}
+  .card-grid-4{grid-template-columns:repeat(2,1fr)!important;}
+  [style*="repeat(4,1fr)"],[style*="repeat(4, 1fr)"]{grid-template-columns:repeat(2,1fr)!important;}
+  [style*="repeat(3,1fr)"],[style*="repeat(3, 1fr)"]{grid-template-columns:1fr!important;}
+  [style*="repeat(5,1fr)"],[style*="repeat(6,1fr)"]{grid-template-columns:repeat(2,1fr)!important;}
+  [style*="2fr 1fr"],[style*="1fr 2fr"],[style*="minmax("]{grid-template-columns:1fr!important;}
+  /* let flex rows shrink/wrap their text instead of overflowing or squishing (buttons keep size) */
+  .content [style*="display:flex"]>*:not(button):not(.btn),
+  .content [style*="display: flex"]>*:not(button):not(.btn){min-width:0;}
+  .filter-bar{gap:8px;flex-wrap:wrap;}
+  .filter-bar input,.filter-bar select{min-width:0!important;width:100%;flex:1 1 100%;}
+  input,textarea,select{font-size:16px!important;}
+  .modal-overlay{padding:0;align-items:flex-end;}
+  .modal{max-width:100%!important;width:100%!important;max-height:92vh;border-radius:16px 16px 0 0;}
+  .modal-header{padding:16px;}
+  .modal-body{padding:16px!important;}
+  .modal-footer{padding:12px 16px;flex-wrap:wrap;gap:8px;}
+  .modal-footer .btn{flex:1 1 auto;min-width:132px;white-space:nowrap;}
+  .tab-bar{overflow-x:auto;}
+  .table-wrap{overflow-x:auto;max-width:100%;}
+  .table-wrap table{min-width:520px;}
+  /* kanban / phase board horizontal scroll */
+  [style*="grid-auto-flow:column"], [style*="grid-auto-flow: column"]{overflow-x:auto;}
+  /* calendar: badge-only cells + tap-to-open day popup (hide the squished sidebar) */
+  .cal-side{display:none!important;}
+  .cal-day-modal{display:flex!important;}
+  .cal-events{display:none!important;}
+  .cal-count-badge{display:inline-flex!important;position:absolute;top:4px;right:4px;}
+  .cal-cell{min-height:46px;padding:5px;}
+  .cal-day-num{margin-bottom:0;}
+  .cal-grid{gap:3px;}
+  /* phase settings rows: title on row 1, controls (incl. Delete) wrap to row 2 so nothing overflows */
+  .settings-phase-header{flex-wrap:wrap;gap:8px;}
+  .settings-phase-header .sp-title{flex:1 1 100%!important;}
+  .settings-phase-header .sp-meta{flex:1 1 100%;justify-content:flex-end;}
+  .settings-task-row{flex-wrap:wrap;}
+  .settings-task-row .inline-input{flex:1 1 100%;min-width:0;}
+}
+@media (max-width:420px){
+  .card-grid-4{grid-template-columns:1fr!important;}
+  [style*="repeat(4,1fr)"]{grid-template-columns:1fr!important;}
+  [style*="repeat(2,1fr)"]{grid-template-columns:1fr!important;}
+}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect, useMemo, useCallback } = React;
+
+const SUPA_URL = "https://ciufbbdzekqlqdzodnrr.supabase.co";
+const SUPA_KEY = "sb_publishable_26hdkwY53clveH7bDPf21w_JGtrY1NP";
+const sb = supabase.createClient(SUPA_URL, SUPA_KEY);
+
+const STAGES = [
+  {key:'new_inquiry',label:'New Inquiry',color:'#8A8480'},
+  {key:'contacted',label:'Contacted',color:'#5B8FD4'},
+  {key:'interviewed',label:'Interviewed',color:'#9B78D4'},
+  {key:'discovery_day',label:'Discovery Day',color:'#E8B85C'},
+  {key:'fdd_sent',label:'FDD Sending',color:'#CC9C3A'},
+  {key:'waiting_for_sign',label:'Waiting for Sign',color:'#E89C5C'},
+  {key:'agreement_signed',label:'Agreement Signed',color:'#5FB87A'},
+  {key:'rejected',label:'Rejected',color:'#E05252'},
+];
+const OWNERS = ['CEO','COO','CMO','CBO','CPO','FRANCHISEE'];
+const SOURCES = ['email','referral','website','broker','event','other'];
+const TITLES = ['CEO','COO','CMO','CBO','CPO'];
+
+function stageStyle(k){const s=STAGES.find(x=>x.key===k)||STAGES[0];return{background:s.color+'22',color:s.color};}
+function stageLabel(k){return(STAGES.find(x=>x.key===k)||STAGES[0]).label;}
+function fmtDate(ts){if(!ts)return'';return new Date(ts).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});}
+function fmtDateTime(ts){if(!ts)return'';const d=new Date(ts);return d.toLocaleDateString('en-US',{month:'short',day:'numeric'})+' '+d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});}
+function isOverdue(ts){return new Date(ts)<new Date();}
+function dayOf(ts){return new Date(ts).getDate();}
+function monShort(ts){return new Date(ts).toLocaleDateString('en-US',{month:'short'});}
+function timeStr(ts){return new Date(ts).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});}
+function daysUntil(dateStr){if(!dateStr)return null;const diff=new Date(dateStr)-new Date();return Math.ceil(diff/(1000*60*60*24));}
+function daysBetween(a,b){if(!a||!b)return null;return Math.round((new Date(b)-new Date(a))/(1000*60*60*24));}
+function parseTerritories(v){if(!v)return[];if(Array.isArray(v))return v;try{return JSON.parse(v);}catch{return v?[{name:v,priority:'primary'}]:[];}}
+
+// ── APP ───────────────────────────────────────────────────
+// Line icons (shared visual language with OPS)
+function NavIcon({k}){
+  const P={
+    dashboard:<path d="M3 12l9-9 9 9M5 10v10h5v-6h4v6h5V10"/>,
+    board:<><rect x="3" y="3" width="7" height="18" rx="1.5"/><rect x="14" y="3" width="7" height="11" rx="1.5"/></>,
+    followups:<><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></>,
+    calendar:<><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/></>,
+    leads:<><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></>,
+    franchisees:<path d="M3 9l1-5h16l1 5M4 9v11h16V9M9 20v-6h6v6"/>,
+    team:<><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></>,
+    settings:<><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M2 12h3M19 12h3M4.9 19.1L7 17M17 7l2.1-2.1"/></>,
+  };
+  return <svg width="17" height="17" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">{P[k]||P.dashboard}</svg>;
+}
+
+function App(){
+  const [session,setSession]=useState(null);
+  const [loading,setLoading]=useState(true);
+  const OS_VIEWS=['dashboard','board','followups','calendar','leads','franchisees','team','settings','password'];
+  const [view,setView]=useState(()=>{
+    const h=(window.location.hash||'').match(/#open=([a-z]+)/);
+    return (h&&OS_VIEWS.includes(h[1]))?h[1]:'dashboard';
+  });
+  useEffect(()=>{try{history.replaceState(null,'','#open='+view);}catch(e){}},[view]);
+  useEffect(()=>{
+    let done=false;
+    const finish=()=>{ if(!done){ done=true; setLoading(false); } };
+    const watchdog=setTimeout(finish,8000); // never hang on the loading screen
+    sb.auth.getSession()
+      .then(({data})=>{ setSession(data.session); })
+      .catch(()=>{})
+      .finally(()=>{ clearTimeout(watchdog); finish(); });
+    const {data:{subscription}}=sb.auth.onAuthStateChange((_,s)=>{ setSession(s); finish(); });
+    return()=>{ clearTimeout(watchdog); subscription.unsubscribe(); };
+  },[]);
+  if(loading)return<div className="loading">Loading...</div>;
+  if(!session)return<AuthScreen/>;
+  return<MainApp view={view} setView={setView} session={session}/>;
+}
+
+function AuthScreen(){
+  const [email,setEmail]=useState('');
+  const [pass,setPass]=useState('');
+  const [err,setErr]=useState('');
+  const [busy,setBusy]=useState(false);
+  async function login(e){e.preventDefault();setBusy(true);setErr('');const{error}=await sb.auth.signInWithPassword({email,password:pass});if(error){setErr(error.message);setBusy(false);}}
+  return(
+    <div className="auth-wrap">
+      <div className="auth-card">
+        <div className="auth-logo">Ugly Donuts</div>
+        <div className="auth-sub">Franchise OS — HQ Access</div>
+        <form onSubmit={login}>
+          <div className="form-group"><label>Email</label><input type="email" value={email} onChange={e=>setEmail(e.target.value)} autoFocus/></div>
+          <div className="form-group"><label>Password</label><input type="password" value={pass} onChange={e=>setPass(e.target.value)}/></div>
+          <button className="btn-gold" type="submit" disabled={busy}>{busy?'Signing in...':'Sign In'}</button>
+          {err&&<div className="auth-err">{err}</div>}
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function MainApp({view,setView,session}){
+  const [badges,setBadges]=useState({followups:0,phaseDue:0});
+  useEffect(()=>{
+    async function count(){
+      const todayEnd=new Date();todayEnd.setHours(23,59,59,999);
+      const[fu,pd]=await Promise.all([
+        sb.from('lead_followups').select('id',{count:'exact',head:true}).eq('completed',false).lte('scheduled_at',todayEnd.toISOString()),
+        sb.from('franchisee_phase_dates').select('id',{count:'exact',head:true}).lte('due_date',todayEnd.toISOString().split('T')[0]).is('completed_at',null),
+      ]);
+      setBadges({followups:fu.count||0,phaseDue:pd.count||0});
+    }
+    count();const t=setInterval(count,60000);return()=>clearInterval(t);
+  },[]);
+  const navItems=[
+    {key:'dashboard',icon:'◈',label:'Dashboard'},
+    {key:'board',icon:'▤',label:'Phase Board'},
+    {key:'followups',icon:'◷',label:'Follow-Ups',badge:badges.followups||null},
+    {key:'calendar',icon:'▦',label:'Calendar',badge:badges.phaseDue||null},
+    {key:'leads',icon:'◉',label:'CRM Lead'},
+    {key:'franchisees',icon:'◍',label:'CRM Franchisees'},
+    {key:'team',icon:'◯',label:'Accounts'},
+    {key:'settings',icon:'◎',label:'Phase Settings'},
+  ];
+  return(
+    <div className="app">
+      <aside className="sidebar">
+        <div className="sidebar-logo"><div className="brand">Ugly Donuts</div><div className="subbrand">Franchise OS</div><a href="/" style={{fontSize:11,color:"#2DD4BF",marginTop:8,display:"block",textDecoration:"none",opacity:.7}} onMouseEnter={e=>e.currentTarget.style.opacity="1"} onMouseLeave={e=>e.currentTarget.style.opacity=".7"}>Franchise Ops →</a></div>
+        <nav className="nav">
+          {navItems.map(n=>(
+            <button key={n.key} data-navkey={n.key} className={`nav-item ${view===n.key?'active':''}`} onClick={()=>setView(n.key)}>
+              <span className="nav-icon" style={{display:'inline-flex',justifyContent:'center'}}><NavIcon k={n.key}/></span>{n.label}
+              {n.badge?<span className="nav-badge">{n.badge}</span>:null}
+            </button>
+          ))}
+        </nav>
+        <div className="sidebar-footer">
+          <div style={{marginBottom:6,fontSize:11,color:'var(--muted)'}}>{session.user.email}</div>
+          <div style={{display:'flex',gap:10}}>
+            <button onClick={()=>setView('password')}>Change Password</button>
+            <button onClick={()=>sb.auth.signOut()} style={{color:'var(--red)'}}>Sign out</button>
+          </div>
+        </div>
+      </aside>
+      <main className="main">
+        {view==='dashboard'&&<Dashboard setView={setView}/>}
+        {view==='leads'&&<LeadCRM/>}
+        {view==='followups'&&<FollowUps/>}
+        {view==='franchisees'&&<FranchiseeTracker/>}
+        {view==='calendar'&&<CalendarView/>}
+        {view==='team'&&<TeamManager/>}
+        {view==='board'&&<PhaseBoard/>}
+        {view==='settings'&&<PhaseSettings/>}
+        {view==='password'&&<ChangePassword onDone={()=>setView('dashboard')}/>}
+      </main>
+      <nav className="tabbar">
+        {[
+          {v:'dashboard',label:'Home',icon:<><path d="M3 12l9-9 9 9M5 10v10h5v-6h4v6h5V10"/></>},
+          {v:'board',label:'Board',icon:<><rect x="3" y="3" width="7" height="18" rx="1.5"/><rect x="14" y="3" width="7" height="11" rx="1.5"/></>},
+          {v:'followups',label:'Follow-ups',badge:badges.followups||null,icon:<><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></>},
+          {v:'leads',label:'Leads',icon:<><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></>},
+          {v:'calendar',label:'Calendar',badge:badges.phaseDue||null,icon:<><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/></>},
+        ].map(t=>(
+          <button key={t.v} className={`tb ${view===t.v?'on':''}`} onClick={()=>{setView(t.v);window.scrollTo(0,0);}}>
+            <svg fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">{t.icon}</svg>
+            {t.label}
+            {t.badge?<span className="tbadge">{t.badge}</span>:null}
+          </button>
+        ))}
+      </nav>
+    </div>
+  );
+}
+
+// ── DASHBOARD ─────────────────────────────────────────────
+function Dashboard({setView}){
+  const [stats,setStats]=useState({leads:0,high:0,active:0,open:0});
+  const [upcomingDue,setUpcomingDue]=useState([]);
+  const [activityFeed,setActivityFeed]=useState([]);
+  const [recentLeads,setRecentLeads]=useState([]);
+  const [fddAlerts,setFddAlerts]=useState([]);
+  const [dueFollowups,setDueFollowups]=useState([]);
+  const [popup,setPopup]=useState(null); // 'leads'|'active'|'open'
+  const [popupData,setPopupData]=useState([]);
+
+  useEffect(()=>{
+    async function load(){
+      const in14=new Date();in14.setDate(in14.getDate()+14);
+      const todayEnd=new Date();todayEnd.setHours(23,59,59,999);
+      const[lRes,fRes,duRes,actRes,fddRes,fuRes]=await Promise.all([
+        sb.from('leads').select('id,stage,grade,name,created_at,converted_to_franchisee').order('created_at',{ascending:false}),
+        sb.from('franchisees').select('*').eq('status','active'),
+        sb.from('franchisee_phase_dates').select('*,franchisees(name,territory),phases(name,color)').lte('due_date',in14.toISOString().split('T')[0]).is('completed_at',null).order('due_date'),
+        sb.from('lead_activities').select('*,leads(name)').order('created_at',{ascending:false}).limit(15),
+        // 14-day signature countdown: only leads in "Waiting for Sign" (FDD has been sent out)
+        sb.from('leads').select('*').eq('stage','waiting_for_sign').order('updated_at',{ascending:false}),
+        sb.from('lead_followups').select('*,leads(name,grade)').eq('completed',false).lte('scheduled_at',todayEnd.toISOString()).order('scheduled_at'),
+      ]);
+      const leads=lRes.data||[];const fr=fRes.data||[];
+      const activeLeads=leads.filter(l=>l.stage!=='rejected'&&!l.converted_to_franchisee);
+      setRecentLeads(activeLeads.slice(0,5));
+      setUpcomingDue(duRes.data||[]);
+      setActivityFeed(actRes.data||[]);
+      // FDD 14-day countdown
+      const fddLeads=(fddRes.data||[]).map(l=>{
+        const days=l.fdd_sent_at?daysUntil(new Date(new Date(l.fdd_sent_at).getTime()+14*86400000).toISOString().split('T')[0]):null;
+        return{...l,days14:days};
+      }).filter(l=>l.fdd_sent_at);
+      setFddAlerts(fddLeads);
+      setDueFollowups(fuRes.data||[]);
+      setStats({leads:activeLeads.length,high:activeLeads.filter(l=>l.grade==='high').length,active:fr.length,open:fr.filter(f=>f.status==='open').length});
+    }
+    load();
+  },[]);
+
+  // Load popup data when popup opens
+  useEffect(()=>{
+    if(!popup){setPopupData([]);return;}
+    async function loadPopup(){
+      if(popup==='leads'){
+        const{data,error}=await sb.from('leads').select('*').neq('stage','rejected').or('converted_to_franchisee.is.null,converted_to_franchisee.eq.false').order('created_at',{ascending:false});
+        setPopupData(data||[]);
+      }else if(popup==='active'){
+        const{data}=await sb.from('franchisees').select('*,phases(name,color)').eq('status','active').order('created_at');
+        setPopupData(data||[]);
+      }else if(popup==='open'){
+        const{data}=await sb.from('franchisees').select('*,phases(name,color)').eq('status','open').order('created_at');
+        setPopupData(data||[]);
+      }
+    }
+    loadPopup();
+  },[popup]);
+
+  const feedIcon={stage_change:'→',call:'📞',email:'✉',meeting:'🤝',note:'◎'};
+
+  return(
+    <>
+      <div className="page-header">
+        <div><div className="page-title">HQ Dashboard</div><div className="page-sub">Franchise system overview</div></div>
+      </div>
+      <div className="content">
+        {(()=>{
+          const dueSoon=upcomingDue.filter(d=>daysUntil(d.due_date)<=7);
+          const sigUrgent=fddAlerts.filter(l=>{const dl=new Date(new Date(l.fdd_sent_at).getTime()+14*86400000);return daysUntil(dl.toISOString().split('T')[0])<=3;});
+          const n=dueFollowups.length+dueSoon.length+sigUrgent.length;
+          const Row=({chip,chipCls,main,sub,btn,go})=>(
+            <div style={{display:'flex',alignItems:'center',gap:12,padding:'11px 18px',borderTop:'1px solid var(--line-soft)'}}>
+              <span className={`badge ${chipCls}`} style={{flexShrink:0}}>{chip}</span>
+              <span style={{minWidth:0,flex:1,display:'flex',flexDirection:'column',gap:1}}>
+                <span style={{fontSize:13.5,fontWeight:800,color:'var(--text)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{main}</span>
+                {sub&&<span style={{fontSize:11.5,color:'var(--muted)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{sub}</span>}
+              </span>
+              <button className="btn btn-primary btn-sm" style={{flexShrink:0}} onClick={go}>{btn}</button>
+            </div>
+          );
+          return(
+            <div className="card" style={{marginBottom:20,padding:0,overflow:'hidden',borderColor:n?'#EDD9A8':'var(--border)'}}>
+              <div style={{display:'flex',alignItems:'center',gap:10,padding:'14px 18px',background:n?'linear-gradient(180deg,#FFFDF7,#FFF)':'#fff'}}>
+                <span style={{fontWeight:800,fontSize:15}}>Needs your action</span>
+                {n>0
+                  ?<span style={{background:'var(--ink)',color:'var(--ink-gold)',fontSize:11,fontWeight:800,borderRadius:10,padding:'2px 9px'}}>{n}</span>
+                  :<span style={{color:'var(--green)',fontSize:12.5,fontWeight:700}}>✓ All clear</span>}
+              </div>
+              {dueFollowups.slice(0,4).map(f=>{
+                const od=new Date(f.scheduled_at)<new Date(new Date().toDateString());
+                return <Row key={f.id} chip={od?'Overdue':'Today'} chipCls={od?'badge-red':'badge-gold'} main={f.leads?.name||'Lead'} sub={f.note} btn="Open" go={()=>setView('followups')}/>;
+              })}
+              {dueFollowups.length>4&&<div style={{padding:'9px 18px',borderTop:'1px solid var(--line-soft)',fontSize:12.5,color:'var(--muted)'}}>+ {dueFollowups.length-4} more follow-ups · <span style={{color:'var(--gold-dim)',fontWeight:700,cursor:'pointer'}} onClick={()=>setView('followups')}>open Follow-Ups →</span></div>}
+              {sigUrgent.map(l=>{
+                const dl=new Date(new Date(l.fdd_sent_at).getTime()+14*86400000);const dd=daysUntil(dl.toISOString().split('T')[0]);
+                return <Row key={l.id} chip="Sign" chipCls="badge-red" main={l.name} sub={`FDD window: ${dd<0?'expired':dd+'d left'}`} btn="Open" go={()=>setView('leads')}/>;
+              })}
+              {dueSoon.slice(0,3).map(d=>(
+                <Row key={d.id} chip="Phase" chipCls="badge-gold" main={d.franchisees?.name||'Franchisee'} sub={`${d.phases?.name||'Phase'} due ${fmtDate(d.due_date)}`} btn="Open" go={()=>setView('calendar')}/>
+              ))}
+            </div>
+          );
+        })()}
+        <div className="card-grid card-grid-2" style={{marginBottom:24}}>
+          <div className="card" style={{cursor:'pointer'}} onClick={()=>setPopup('leads')}><div className="stat-label">Active Leads</div><div className="stat-value gold">{stats.leads}</div><div className="stat-sub">{stats.high} high priority</div></div>
+          <div className="card"><div className="stat-label">Due This Week</div>
+            <div className="stat-value" style={{color:upcomingDue.filter(d=>daysUntil(d.due_date)<=7).length>0?'var(--orange)':'var(--text)'}}>{upcomingDue.filter(d=>daysUntil(d.due_date)<=7).length}</div>
+            <div className="stat-sub">Phase milestones</div></div>
+        </div>
+
+        {/* FDD 14-day alerts */}
+        {fddAlerts.length>0&&(
+          <div style={{background:'rgba(204,156,58,.08)',border:'1px solid rgba(204,156,58,.3)',borderRadius:10,padding:'12px 16px',marginBottom:20}}>
+            <div style={{fontSize:12,fontWeight:700,color:'var(--gold)',marginBottom:8,letterSpacing:'.06em',textTransform:'uppercase'}}>Awaiting Signature · 14-Day Window</div>
+            {fddAlerts.map(l=>{
+              const deadline=new Date(new Date(l.fdd_sent_at).getTime()+14*86400000);
+              const days=daysUntil(deadline.toISOString().split('T')[0]);
+              return(
+                <div key={l.id} style={{display:'flex',alignItems:'center',gap:10,padding:'6px 0',borderBottom:'1px solid rgba(204,156,58,.15)'}}>
+                  <span style={{fontSize:13,fontWeight:600,flex:1}}>{l.name}</span>
+                  <span style={{fontSize:12,color:'var(--muted)'}}>{l.territory_interest||parseTerritories(l.territories).map(t=>t.name||t).join(', ')}</span>
+                  <span style={{fontSize:12,fontWeight:700,color:days<=0?'var(--red)':days<=3?'var(--orange)':'var(--gold)'}}>
+                    {days<=0?'EXPIRED':days===1?'1 day left':`${days} days left`}
+                  </span>
+                  <span style={{fontSize:11,color:'var(--muted)'}}>14-day window · {fmtDate(deadline)}</span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        <div className="card-grid card-grid-2">
+          <div>
+            <div className="card" style={{marginBottom:16}}>
+              <div style={{fontWeight:700,marginBottom:16,display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                Upcoming Phase Due Dates
+                <button className="btn btn-ghost btn-sm" onClick={()=>setView('calendar')}>Calendar</button>
+              </div>
+              {upcomingDue.length===0&&<div style={{color:'var(--muted)',fontSize:13}}>No upcoming due dates.</div>}
+              {upcomingDue.slice(0,5).map(d=>{
+                const days=daysUntil(d.due_date);
+                return(
+                  <div key={d.id} style={{display:'flex',alignItems:'center',gap:10,padding:'8px 0',borderBottom:'1px solid var(--border)'}}>
+                    <div style={{width:8,height:8,borderRadius:'50%',background:d.phases?.color||'var(--gold)',flexShrink:0}}/>
+                    <div style={{flex:1}}>
+                      <div style={{fontSize:13,fontWeight:600}}>{d.franchisees?.name}</div>
+                      <div style={{fontSize:11,color:'var(--muted)'}}>{d.phases?.name} · {d.franchisees?.territory}</div>
+                    </div>
+                    <div style={{textAlign:'right'}}>
+                      <div style={{fontSize:12,color:days<0?'var(--red)':days<=3?'var(--orange)':'var(--muted)'}}>{fmtDate(d.due_date)}</div>
+                      <div style={{fontSize:11,color:days<0?'var(--red)':days<=3?'var(--orange)':'var(--muted2)'}}>{days<0?`${Math.abs(days)}d overdue`:days===0?'Today':days===1?'Tomorrow':`${days}d`}</div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="card">
+              <div style={{fontWeight:700,marginBottom:16,display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                Recent Leads<button className="btn btn-ghost btn-sm" onClick={()=>setView('leads')}>See all</button>
+              </div>
+              {recentLeads.map(l=>(
+                <div key={l.id} style={{display:'flex',alignItems:'center',gap:10,padding:'8px 0',borderBottom:'1px solid var(--border)'}}>
+                  <span className={`badge badge-${l.grade}`}>{l.grade}</span>
+                  <span style={{flex:1,fontSize:13}}>{l.name}</span>
+                  <span className="stage-pill" style={stageStyle(l.stage)}>{stageLabel(l.stage)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* HQ Activity Feed */}
+          <div className="card" style={{maxHeight:480,overflowY:'auto'}}>
+            <div style={{fontWeight:700,marginBottom:16,fontSize:15}}>Activity Feed</div>
+            {activityFeed.length===0&&<div style={{color:'var(--muted)',fontSize:13}}>No activity yet.</div>}
+            {activityFeed.map(a=>(
+              <div key={a.id} style={{display:'flex',gap:10,padding:'9px 0',borderBottom:'1px solid var(--border)'}}>
+                <div style={{width:26,height:26,borderRadius:'50%',background:'var(--panel2)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:12,flexShrink:0,marginTop:1}}>
+                  {feedIcon[a.activity_type]||'◎'}
+                </div>
+                <div>
+                  <div style={{fontSize:13}}><span style={{fontWeight:600}}>{a.leads?.name}</span> — {a.description}</div>
+                  <div style={{fontSize:11,color:'var(--muted)',marginTop:2}}>{a.performed_by} · {fmtDateTime(a.created_at)}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+      {popup&&(
+        <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&setPopup(null)}>
+          <div className="modal modal-lg">
+            <div className="modal-header">
+              <div className="modal-title">
+                {popup==='leads'&&`Active Leads (${popupData.length})`}
+                {popup==='active'&&`In Development (${popupData.length})`}
+                {popup==='open'&&`Stores Open (${popupData.length})`}
+              </div>
+              <button className="close-btn" onClick={()=>setPopup(null)}>×</button>
+            </div>
+            <div className="modal-body">
+              {popup==='leads'&&(
+                <div>
+                  {popupData.map(l=>(
+                    <div key={l.id} style={{display:'flex',alignItems:'center',gap:10,padding:'10px 0',borderBottom:'1px solid var(--border)'}}>
+                      <span className={`badge badge-${l.grade}`}>{l.grade}</span>
+                      <div style={{flex:1}}>
+                        <div style={{fontSize:13,fontWeight:600}}>{l.name}</div>
+                        <div style={{fontSize:11,color:'var(--muted)',marginTop:2}}>{l.email} · {parseTerritories(l.territories).map(t=>t.name||t).join(', ')||l.territory_interest||'—'}</div>
+                      </div>
+                      <span className="stage-pill" style={stageStyle(l.stage)}>{stageLabel(l.stage)}</span>
+                      <span style={{fontSize:11,color:'var(--muted)'}}>{fmtDate(l.created_at)}</span>
+                    </div>
+                  ))}
+                  {popupData.length===0&&<div style={{color:'var(--muted)',textAlign:'center',padding:'30px 0'}}>No active leads.</div>}
+                </div>
+              )}
+              {(popup==='active'||popup==='open')&&(
+                <div>
+                  {popupData.map(f=>(
+                    <div key={f.id} style={{display:'flex',alignItems:'center',gap:10,padding:'10px 0',borderBottom:'1px solid var(--border)'}}>
+                      <div style={{width:10,height:10,borderRadius:'50%',background:f.phases?.color||'var(--gold)',flexShrink:0}}/>
+                      <div style={{flex:1}}>
+                        <div style={{fontSize:13,fontWeight:600}}>{f.store_name||f.name}{f.store_name&&<span style={{fontSize:11,color:'var(--muted)',marginLeft:6}}>({f.name})</span>}</div>
+                        <div style={{fontSize:11,color:'var(--muted)',marginTop:2}}>{f.territory} · {f.entity_name||'No entity'}</div>
+                      </div>
+                      <div style={{textAlign:'right'}}>
+                        <div style={{fontSize:12,color:f.phases?.color||'var(--gold)',fontWeight:600}}>{f.phases?.name||'—'}</div>
+                        {f.email&&<a href={`mailto:${f.email}`} style={{fontSize:11,color:'var(--blue)',textDecoration:'none'}}>✉ Email</a>}
+                      </div>
+                    </div>
+                  ))}
+                  {popupData.length===0&&<div style={{color:'var(--muted)',textAlign:'center',padding:'30px 0'}}>None yet.</div>}
+                </div>
+              )}
+            </div>
+            <div className="modal-footer"><button className="btn btn-ghost" onClick={()=>setPopup(null)}>Close</button></div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+// ── CALENDAR ──────────────────────────────────────────────
+function CalendarView(){
+  const today=new Date();
+  const [year,setYear]=useState(today.getFullYear());
+  const [month,setMonth]=useState(today.getMonth());
+  const [events,setEvents]=useState([]);
+  const [followupEvents,setFollowupEvents]=useState([]);
+  const [filterType,setFilterType]=useState('all');
+  const [selectedDay,setSelectedDay]=useState(null);
+
+  useEffect(()=>{
+    async function load(){
+      const start=new Date(year,month,1).toISOString().split('T')[0];
+      const end=new Date(year,month+1,0).toISOString().split('T')[0];
+      const[phRes,fuRes]=await Promise.all([
+        sb.from('franchisee_phase_dates').select('*,franchisees(name,territory),phases(name,color)').gte('due_date',start).lte('due_date',end),
+        sb.from('lead_followups').select('*,leads(name,grade)').eq('completed',false).gte('scheduled_at',start+'T00:00:00').lte('scheduled_at',end+'T23:59:59'),
+      ]);
+      setEvents(phRes.data||[]);setFollowupEvents(fuRes.data||[]);
+    }
+    load();
+  },[year,month]);
+
+  const monthName=new Date(year,month).toLocaleDateString('en-US',{month:'long',year:'numeric'});
+  const firstDay=new Date(year,month,1).getDay();
+  const daysInMonth=new Date(year,month+1,0).getDate();
+  const cells=[];
+  const prevDays=new Date(year,month,0).getDate();
+  for(let i=firstDay-1;i>=0;i--)cells.push({day:prevDays-i,curr:false});
+  for(let d=1;d<=daysInMonth;d++)cells.push({day:d,curr:true});
+  while(cells.length%7!==0)cells.push({day:cells.length-daysInMonth-firstDay+1,curr:false});
+
+  function eventsForDay(d){
+    const dateStr=`${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const ph=(filterType==='all'||filterType==='phase')?events.filter(e=>e.due_date===dateStr):[];
+    const fu=(filterType==='all'||filterType==='followup')?followupEvents.filter(e=>e.scheduled_at?.startsWith(dateStr)):[];
+    return{ph,fu,dateStr};
+  }
+  function handleDayClick(c){if(!c.curr)return;const r=eventsForDay(c.day);setSelectedDay({day:c.day,...r});}
+  function prevMonth(){setSelectedDay(null);if(month===0){setMonth(11);setYear(y=>y-1);}else setMonth(m=>m-1);}
+  function nextMonth(){setSelectedDay(null);if(month===11){setMonth(0);setYear(y=>y+1);}else setMonth(m=>m+1);}
+
+  const selectedDateLabel=selectedDay?new Date(selectedDay.dateStr+'T12:00:00').toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'}):'';
+  const totalSelected=selectedDay?(selectedDay.ph.length+selectedDay.fu.length):0;
+  const refreshDay=()=>{const r=eventsForDay(selectedDay.day);setSelectedDay(s=>({...s,...r}));};
+  const dayDetailInner=selectedDay&&(
+    <>
+      {totalSelected===0&&<div style={{textAlign:'center',padding:'40px 0',color:'var(--muted)'}}><div style={{fontSize:28,marginBottom:8}}>◌</div><div style={{fontSize:13}}>Nothing scheduled</div></div>}
+      {selectedDay.ph.length>0&&(
+        <div style={{marginBottom:16}}>
+          <div style={{fontSize:10,fontWeight:700,color:'var(--muted)',letterSpacing:'.1em',textTransform:'uppercase',marginBottom:10}}>Phase Milestones · {selectedDay.ph.length}</div>
+          {selectedDay.ph.map(e=><PhaseEventCard key={e.id} e={e} onRefresh={refreshDay}/>)}
+        </div>
+      )}
+      {selectedDay.fu.length>0&&(
+        <div>
+          <div style={{fontSize:10,fontWeight:700,color:'var(--muted)',letterSpacing:'.1em',textTransform:'uppercase',marginBottom:10}}>Follow-Ups · {selectedDay.fu.length}</div>
+          {selectedDay.fu.map(e=><FollowupEventCard key={e.id} e={e} onRefresh={refreshDay}/>)}
+        </div>
+      )}
+    </>
+  );
+
+  return(
+    <>
+      <div className="page-header">
+        <div><div className="page-title">Calendar</div><div className="page-sub">Phase milestones and follow-up schedule</div></div>
+        <div style={{display:'flex',gap:8}}>
+          {['all','phase','followup'].map(k=>(
+            <button key={k} className={`btn btn-sm ${filterType===k?'btn-primary':'btn-ghost'}`} onClick={()=>setFilterType(k)}>
+              {k==='all'?'All':k==='phase'?'Phase Dates':'Follow-Ups'}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="content">
+        <div style={{display:'grid',gridTemplateColumns:'2fr 1fr',gap:16}}>
+          <div className="card" style={{padding:16}}>
+            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:16}}>
+              <button className="btn btn-ghost btn-sm" onClick={prevMonth}>← Prev</button>
+              <div style={{fontWeight:700,fontSize:16}}>{monthName}</div>
+              <button className="btn btn-ghost btn-sm" onClick={nextMonth}>Next →</button>
+            </div>
+            <div className="cal-grid" style={{marginBottom:4}}>
+              {['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d=><div key={d} className="cal-header-cell">{d}</div>)}
+            </div>
+            <div className="cal-grid">
+              {cells.map((c,i)=>{
+                if(!c.curr)return<div key={i} className="cal-cell other-month"><div className="cal-day-num">{c.day}</div></div>;
+                const isToday=c.day===today.getDate()&&month===today.getMonth()&&year===today.getFullYear();
+                const isSelected=selectedDay?.day===c.day;
+                const{ph,fu}=eventsForDay(c.day);
+                const total=ph.length+fu.length;
+                return(
+                  <div key={i} className={`cal-cell ${isToday?'today':''}`} onClick={()=>handleDayClick(c)}
+                    style={{cursor:'pointer',outline:isSelected?'2px solid var(--gold)':'none',outlineOffset:'-2px',background:isSelected?'rgba(204,156,58,.08)':''}}>
+                    <div className="cal-day-num" style={{color:isToday||isSelected?'var(--gold)':''}}>{c.day}</div>
+                    {total>0&&<span className="cal-count-badge" style={{background:ph.length?'#CC9C3A':'#5B8FD4'}}>{total}</span>}
+                    <div className="cal-events">
+                      {ph.slice(0,2).map(e=><div key={e.id} className="cal-event" style={{background:(e.phases?.color||'#CC9C3A')+'33',color:e.phases?.color||'#CC9C3A'}}>{e.franchisees?.name}</div>)}
+                      {fu.slice(0,Math.max(0,2-ph.length)).map(e=><div key={e.id} className="cal-event" style={{background:'rgba(91,143,212,.25)',color:'#5B8FD4'}}>{e.leads?.name}</div>)}
+                      {total>2&&<div style={{fontSize:9,color:'var(--muted)',marginTop:1}}>+{total-2} more</div>}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <div style={{display:'flex',gap:16,marginTop:12,paddingTop:12,borderTop:'1px solid var(--border)'}}>
+              <div style={{display:'flex',alignItems:'center',gap:5,fontSize:11,color:'var(--muted)'}}><div style={{width:10,height:10,borderRadius:2,background:'rgba(204,156,58,.4)'}}/>Phase Due</div>
+              <div style={{display:'flex',alignItems:'center',gap:5,fontSize:11,color:'var(--muted)'}}><div style={{width:10,height:10,borderRadius:2,background:'rgba(91,143,212,.4)'}}/>Follow-Up</div>
+              <div style={{display:'flex',alignItems:'center',gap:5,fontSize:11,color:'var(--muted)'}}><div style={{width:10,height:10,borderRadius:2,border:'2px solid var(--gold)',background:'transparent'}}/>Today</div>
+            </div>
+          </div>
+          <div className="card cal-side" style={{maxHeight:600,overflowY:'auto'}}>
+            {selectedDay?(
+              <>
+                <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',marginBottom:16}}>
+                  <div><div style={{fontWeight:700,fontSize:15}}>{selectedDateLabel}</div><div style={{fontSize:12,color:'var(--muted)',marginTop:3}}>{totalSelected===0?'No events':`${totalSelected} event${totalSelected>1?'s':''}`}</div></div>
+                  <button className="btn btn-ghost btn-sm" onClick={()=>setSelectedDay(null)}>✕</button>
+                </div>
+                {dayDetailInner}
+              </>
+            ):(
+              <>
+                <div style={{fontWeight:700,marginBottom:6,fontSize:15}}>Coming Up</div>
+                <div style={{fontSize:12,color:'var(--muted)',marginBottom:14}}>Click any date to see details</div>
+                {[...events,...followupEvents].length===0&&<div style={{color:'var(--muted)',fontSize:13}}>No events this month.</div>}
+                {events.sort((a,b)=>new Date(a.due_date)-new Date(b.due_date)).map(e=>{
+                  const days=daysUntil(e.due_date);
+                  return(
+                    <div key={e.id} style={{padding:'10px 0',borderBottom:'1px solid var(--border)',cursor:'pointer'}} onClick={()=>{const d=new Date(e.due_date+'T12:00:00').getDate();setSelectedDay({day:d,...eventsForDay(d)});}}>
+                      <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:2}}>
+                        <div style={{width:8,height:8,borderRadius:'50%',background:e.phases?.color||'var(--gold)',flexShrink:0}}/>
+                        <span style={{fontSize:13,fontWeight:600}}>{e.franchisees?.name}</span>
+                        <span style={{marginLeft:'auto',fontSize:11,color:days<0?'var(--red)':days<=3?'var(--orange)':'var(--muted)'}}>{days<0?`${Math.abs(days)}d late`:days===0?'Today':days===1?'Tomorrow':`${days}d`}</span>
+                      </div>
+                      <div style={{fontSize:11,color:'var(--muted)',paddingLeft:16}}>{e.phases?.name} · {fmtDate(e.due_date)}</div>
+                    </div>
+                  );
+                })}
+                {followupEvents.sort((a,b)=>new Date(a.scheduled_at)-new Date(b.scheduled_at)).map(e=>(
+                  <div key={e.id} style={{padding:'10px 0',borderBottom:'1px solid var(--border)',cursor:'pointer'}} onClick={()=>{const d=new Date(e.scheduled_at).getDate();setSelectedDay({day:d,...eventsForDay(d)});}}>
+                    <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:2}}>
+                      <div style={{width:8,height:8,borderRadius:'50%',background:'#5B8FD4',flexShrink:0}}/>
+                      <span style={{fontSize:13,fontWeight:600}}>{e.leads?.name}</span>
+                      <span style={{marginLeft:'auto',fontSize:11,color:'var(--muted)'}}>{timeStr(e.scheduled_at)}</span>
+                    </div>
+                    <div style={{fontSize:11,color:'var(--muted)',paddingLeft:16}}>Follow-up: {e.title}</div>
+                  </div>
+                ))}
+              </>
+            )}
+          </div>
+        </div>
+        {selectedDay&&(
+          <div className="modal-overlay cal-day-modal" onClick={()=>setSelectedDay(null)}>
+            <div className="modal" onClick={e=>e.stopPropagation()}>
+              <div className="modal-header" style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',gap:12}}>
+                <div><div style={{fontWeight:700,fontSize:15}}>{selectedDateLabel}</div><div style={{fontSize:12,color:'var(--muted)',marginTop:3}}>{totalSelected===0?'No events':`${totalSelected} event${totalSelected>1?'s':''}`}</div></div>
+                <button className="btn btn-ghost btn-sm" onClick={()=>setSelectedDay(null)}>✕</button>
+              </div>
+              <div className="modal-body">{dayDetailInner}</div>
+            </div>
+          </div>
+        )}
+      </div>
+    </>
+  );
+}
+
+function PhaseEventCard({e,onRefresh}){
+  const [editing,setEditing]=useState(false);
+  const [newDate,setNewDate]=useState(e.due_date||'');
+  const [busy,setBusy]=useState(false);
+  const days=daysUntil(e.due_date);
+  async function saveDate(){if(!newDate)return;setBusy(true);await sb.from('franchisee_phase_dates').update({due_date:newDate}).eq('id',e.id);await sb.from('franchisees').update({phase_due_date:newDate}).eq('id',e.franchisee_id);setBusy(false);setEditing(false);if(onRefresh)onRefresh();}
+  async function deleteDate(){if(!window.confirm('Remove this due date?'))return;await sb.from('franchisee_phase_dates').update({due_date:null}).eq('id',e.id);await sb.from('franchisees').update({phase_due_date:null}).eq('id',e.franchisee_id);if(onRefresh)onRefresh();}
+  return(
+    <div style={{padding:'12px',background:'var(--panel2)',borderRadius:8,marginBottom:8,borderLeft:`3px solid ${e.phases?.color||'var(--gold)'}`}}>
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:4}}>
+        <span style={{fontWeight:700,fontSize:13}}>{e.franchisees?.name}</span>
+        <div style={{display:'flex',alignItems:'center',gap:6}}>
+          <span style={{fontSize:11,color:days<0?'var(--red)':days===0?'var(--orange)':'var(--muted)',fontWeight:600}}>{days<0?`${Math.abs(days)}d overdue`:days===0?'Today':days===1?'Tomorrow':`${days}d`}</span>
+          <button className="btn btn-ghost btn-sm" onClick={()=>setEditing(s=>!s)} style={{padding:'2px 7px',fontSize:11}}>{editing?'Cancel':'Edit'}</button>
+          <button className="btn btn-danger btn-sm" onClick={deleteDate} style={{padding:'2px 7px',fontSize:11}}>Delete</button>
+        </div>
+      </div>
+      <div style={{fontSize:12,color:e.phases?.color||'var(--gold)',marginBottom:2}}>{e.phases?.name}</div>
+      <div style={{fontSize:11,color:'var(--muted)'}}>{e.franchisees?.territory}</div>
+      {editing&&(
+        <div style={{display:'flex',gap:8,alignItems:'center',marginTop:8}}>
+          <input type="date" value={newDate} onChange={ev=>setNewDate(ev.target.value)} style={{background:'var(--panel)',border:'1px solid var(--border2)',borderRadius:6,padding:'5px 8px',color:'var(--text)',fontFamily:'inherit',fontSize:12,outline:'none',flex:1}}/>
+          <button className="btn btn-primary btn-sm" onClick={saveDate} disabled={busy||!newDate}>{busy?'...':'Save'}</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function FollowupEventCard({e,onRefresh}){
+  const [editing,setEditing]=useState(false);
+  const [newDT,setNewDT]=useState(e.scheduled_at?e.scheduled_at.slice(0,16):'');
+  const [busy,setBusy]=useState(false);
+  async function saveDate(){if(!newDT)return;setBusy(true);await sb.from('lead_followups').update({scheduled_at:new Date(newDT).toISOString()}).eq('id',e.id);setBusy(false);setEditing(false);if(onRefresh)onRefresh();}
+  async function deleteFU(){if(!window.confirm('Delete this follow-up?'))return;await sb.from('lead_followups').delete().eq('id',e.id);if(onRefresh)onRefresh();}
+  return(
+    <div style={{padding:'12px',background:'var(--panel2)',borderRadius:8,marginBottom:8,borderLeft:'3px solid #5B8FD4'}}>
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:4}}>
+        <span style={{fontWeight:700,fontSize:13}}>{e.leads?.name}</span>
+        <div style={{display:'flex',gap:6,alignItems:'center'}}>
+          <span style={{fontSize:11,color:'#5B8FD4',fontWeight:600}}>{timeStr(e.scheduled_at)}</span>
+          <button className="btn btn-ghost btn-sm" onClick={()=>setEditing(s=>!s)} style={{padding:'2px 7px',fontSize:11}}>{editing?'Cancel':'Edit'}</button>
+          <button className="btn btn-danger btn-sm" onClick={deleteFU} style={{padding:'2px 7px',fontSize:11}}>Delete</button>
+        </div>
+      </div>
+      <div style={{fontSize:12,color:'#5B8FD4',marginBottom:2}}>{e.title}</div>
+      <div style={{display:'flex',alignItems:'center',gap:6}}>
+        <span style={{fontSize:11,color:'var(--muted)'}}>{e.assigned_to}</span>
+        {e.leads?.grade&&<span className={`badge badge-${e.leads.grade}`}>{e.leads.grade}</span>}
+      </div>
+      {editing&&(
+        <div style={{display:'flex',gap:8,alignItems:'center',marginTop:8}}>
+          <input type="datetime-local" value={newDT} onChange={ev=>setNewDT(ev.target.value)} style={{background:'var(--panel)',border:'1px solid var(--border2)',borderRadius:6,padding:'5px 8px',color:'var(--text)',fontFamily:'inherit',fontSize:12,outline:'none',flex:1}}/>
+          <button className="btn btn-primary btn-sm" onClick={saveDate} disabled={busy||!newDT}>{busy?'...':'Save'}</button>
+        </div>
+      )}
+      {e.notes&&!editing&&<div style={{fontSize:11,color:'var(--muted2)',marginTop:6,fontStyle:'italic'}}>{e.notes}</div>}
+    </div>
+  );
+}
+
+// ── LEAD CRM ──────────────────────────────────────────────
+function LeadCRM(){
+  const [leads,setLeads]=useState([]);
+  const [loading,setLoading]=useState(true);
+  const [search,setSearch]=useState('');
+  const [filterGrade,setFilterGrade]=useState('all');
+  const [filterStage,setFilterStage]=useState('all');
+  const [showModal,setShowModal]=useState(false);
+  const [selected,setSelected]=useState(null);
+  const [showCSV,setShowCSV]=useState(false);
+
+  async function load(){setLoading(true);const{data}=await sb.from('leads').select('*').or('converted_to_franchisee.is.null,converted_to_franchisee.eq.false').order('created_at',{ascending:false});setLeads(data||[]);setLoading(false);}
+  useEffect(()=>{load();},[]);
+
+  const filtered=useMemo(()=>leads.filter(l=>{
+    const q=search.toLowerCase();
+    const terrs=parseTerritories(l.territories).map(t=>(t.name||t).toLowerCase()).join(' ');
+    return(!q||l.name?.toLowerCase().includes(q)||l.email?.toLowerCase().includes(q)||terrs.includes(q))
+      &&(filterGrade==='all'||l.grade===filterGrade)&&(filterStage==='all'||l.stage===filterStage);
+  }),[leads,search,filterGrade,filterStage]);
+
+  return(
+    <>
+      <div className="page-header">
+        <div><div className="page-title">Lead CRM</div><div className="page-sub">Managed by Deborah · CMO</div></div>
+        <div style={{display:'flex',gap:8}}>
+          <button className="btn btn-ghost" onClick={()=>setShowCSV(true)}>↑ Import CSV</button>
+          <button className="btn btn-primary" onClick={()=>{setSelected(null);setShowModal(true);}}>+ Add Lead</button>
+        </div>
+      </div>
+      <div className="content">
+        <div className="filter-bar">
+          <input placeholder="Search name, email, territory..." value={search} onChange={e=>setSearch(e.target.value)}/>
+          <select value={filterGrade} onChange={e=>setFilterGrade(e.target.value)}>
+            <option value="all">All Grades</option><option value="high">High</option><option value="mid">Mid</option><option value="low">Low</option>
+          </select>
+          <select value={filterStage} onChange={e=>setFilterStage(e.target.value)}>
+            <option value="all">All Stages</option>
+            {STAGES.map(s=><option key={s.key} value={s.key}>{s.label}</option>)}
+          </select>
+          <span style={{marginLeft:'auto',fontSize:13,color:'var(--muted)'}}>{filtered.length} leads</span>
+        </div>
+        {loading?<div className="loading">Loading...</div>:(
+          <div className="table-wrap">
+            <table>
+              <thead><tr><th>Name</th><th>Grade</th><th>Stage</th><th>Territories</th><th>Source</th><th>Added</th></tr></thead>
+              <tbody>
+                {filtered.length===0&&<tr><td colSpan={6}><div className="empty"><div className="empty-icon">◉</div><div className="empty-title">No leads found</div></div></td></tr>}
+                {filtered.map(l=>{
+                  const terrs=parseTerritories(l.territories);
+                  return(
+                    <tr key={l.id} onClick={()=>{setSelected(l);setShowModal(true);}} style={{cursor:'pointer'}}>
+                      <td data-label="Name"><span style={{fontWeight:600}}>{l.name}</span>{l.email&&<div style={{fontSize:11,color:'var(--muted)'}}>{l.email}</div>}</td>
+                      <td data-label="Grade"><span className={`badge badge-${l.grade}`}>{l.grade}</span></td>
+                      <td data-label="Stage"><span className="stage-pill" style={stageStyle(l.stage)}>{stageLabel(l.stage)}</span></td>
+                      <td data-label="Territories">
+                        {terrs.length===0&&<span style={{color:'var(--muted)',fontSize:12}}>—</span>}
+                        {terrs.map((t,i)=>(
+                          <span key={i} style={{display:'inline-block',background:(t.priority==='primary')?'rgba(204,156,58,.15)':'#EFE9DB',color:(t.priority==='primary')?'var(--gold)':'var(--muted)',borderRadius:4,padding:'1px 6px',fontSize:11,marginRight:4,marginBottom:2}}>
+                            {t.name||t}
+                          </span>
+                        ))}
+                      </td>
+                      <td data-label="Source" style={{color:'var(--muted)',fontSize:12}}>{l.source}</td>
+                      <td data-label="Added" style={{color:'var(--muted)',fontSize:12}}>{fmtDate(l.created_at)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+      {showModal&&<LeadModal lead={selected} allLeads={leads} onClose={()=>{setShowModal(false);load();}}/>}
+      {showCSV&&<CSVImportModal onClose={()=>{setShowCSV(false);load();}}/>}
+    </>
+  );
+}
+
+// ── CSV IMPORT ────────────────────────────────────────────
+function CSVImportModal({onClose}){
+  const [raw,setRaw]=useState('');
+  const [parsed,setParsed]=useState([]);
+  const [busy,setBusy]=useState(false);
+  const [done,setDone]=useState(false);
+
+  function parseCsv(text){
+    const lines=text.trim().split('\n').filter(l=>l.trim());
+    if(lines.length<2)return[];
+    const headers=lines[0].split(',').map(h=>h.trim().toLowerCase().replace(/\s+/g,'_'));
+    return lines.slice(1).map(line=>{
+      const vals=line.split(',').map(v=>v.trim().replace(/^"|"$/g,''));
+      const obj={};headers.forEach((h,i)=>obj[h]=vals[i]||'');
+      return obj;
+    });
+  }
+
+  function handleText(t){
+    setRaw(t);
+    const rows=parseCsv(t);
+    setParsed(rows);
+  }
+
+  async function doImport(){
+    if(!parsed.length)return;
+    setBusy(true);
+    const toInsert=parsed.map(r=>({
+      name:r.name||r.full_name||'Unknown',
+      email:r.email||'',
+      phone:r.phone||'',
+      source:r.source||'email',
+      grade:['high','mid','low'].includes(r.grade)?r.grade:'mid',
+      stage:'new_inquiry',
+      assigned_to:r.assigned_to||'CMO',
+      notes:r.notes||'',
+      territories:r.territory?JSON.stringify([{name:r.territory,priority:'primary'}]):'[]',
+    }));
+    await sb.from('leads').insert(toInsert);
+    setBusy(false);setDone(true);
+  }
+
+  return(
+    <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
+      <div className="modal modal-lg">
+        <div className="modal-header"><div className="modal-title">Import Leads from CSV</div><button className="close-btn" onClick={onClose}>×</button></div>
+        <div className="modal-body">
+          {done?(
+            <div style={{textAlign:'center',padding:'30px 0'}}>
+              <div style={{fontSize:32,marginBottom:12}}>✓</div>
+              <div style={{fontWeight:700,fontSize:16,color:'var(--green)',marginBottom:6}}>{parsed.length} leads imported</div>
+              <button className="btn btn-primary" onClick={onClose}>Done</button>
+            </div>
+          ):(
+            <>
+              <div style={{fontSize:13,color:'var(--muted)',marginBottom:12}}>
+                Paste CSV with columns: <code style={{background:'var(--panel2)',padding:'1px 5px',borderRadius:3}}>name, email, phone, territory, grade, source, notes</code>
+              </div>
+              <div className="form-group">
+                <label>CSV Data</label>
+                <textarea value={raw} onChange={e=>handleText(e.target.value)} style={{minHeight:160,fontFamily:'monospace',fontSize:12}} placeholder={"name,email,phone,territory,grade\nJohn Smith,john@email.com,555-1234,Dallas TX,high"}/>
+              </div>
+              {parsed.length>0&&(
+                <div style={{background:'var(--panel2)',borderRadius:8,padding:12,marginBottom:12}}>
+                  <div style={{fontSize:13,fontWeight:600,marginBottom:8,color:'var(--green)'}}>{parsed.length} rows detected</div>
+                  <div style={{maxHeight:120,overflowY:'auto'}}>
+                    {parsed.slice(0,5).map((r,i)=>(
+                      <div key={i} style={{fontSize:12,color:'var(--muted)',padding:'3px 0',borderBottom:'1px solid var(--border)'}}>{r.name||'?'} · {r.email||'no email'} · {r.territory||'no territory'}</div>
+                    ))}
+                    {parsed.length>5&&<div style={{fontSize:11,color:'var(--muted2)',marginTop:4}}>...and {parsed.length-5} more</div>}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+        {!done&&(
+          <div className="modal-footer">
+            <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
+            <button className="btn btn-primary" onClick={doImport} disabled={busy||!parsed.length}>{busy?'Importing...':'Import '+parsed.length+' Leads'}</button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── LEAD MODAL ────────────────────────────────────────────
+function LeadModal({lead,allLeads,onClose}){
+  const isNew=!lead;
+  const [form,setForm]=useState({
+    name:lead?.name||'',email:lead?.email||'',phone:lead?.phone||'',
+    source:lead?.source||'email',grade:lead?.grade||'mid',
+    stage:lead?.stage||'new_inquiry',assigned_to:lead?.assigned_to||'CMO',
+    liquid_capital:lead?.liquid_capital||'$',net_worth:lead?.net_worth||'$',
+    multi_unit_experience:lead?.multi_unit_experience||'',notes:lead?.notes||'',
+  });
+  const [territories,setTerritories]=useState(parseTerritories(lead?.territories));
+  const [activities,setActivities]=useState([]);
+  const [followups,setFollowups]=useState([]);
+  const [tab,setTab]=useState('info');
+  const [busy,setBusy]=useState(false);
+  const [showConvert,setShowConvert]=useState(false);
+  const [convertForm,setConvertForm]=useState({territory:'',fa_signed_date:new Date().toISOString().split('T')[0],entity_name:'',unit_count:1});
+  const [dupWarning,setDupWarning]=useState('');
+  const [showFU,setShowFU]=useState(false);
+  const [fuForm,setFuForm]=useState({title:'',scheduled_at:'',notes:'',assigned_to:'CMO'});
+  const [actForm,setActForm]=useState({activity_type:'note',description:''});
+  const set=(k,v)=>setForm(f=>({...f,[k]:v}));
+
+  useEffect(()=>{
+    if(!isNew){
+      sb.from('lead_activities').select('*').eq('lead_id',lead.id).order('created_at',{ascending:false}).then(r=>setActivities(r.data||[]));
+      sb.from('lead_followups').select('*').eq('lead_id',lead.id).order('scheduled_at').then(r=>setFollowups(r.data||[]));
+    }
+  },[]);
+
+  // Duplicate detection
+  useEffect(()=>{
+    if(!form.email&&!form.name)return;
+    const dup=allLeads?.find(l=>l.id!==lead?.id&&(
+      (form.email&&l.email?.toLowerCase()===form.email.toLowerCase())||
+      (form.name&&l.name?.toLowerCase()===form.name.toLowerCase())
+    ));
+    setDupWarning(dup?`Possible duplicate: "${dup.name}" (${stageLabel(dup.stage)}) already exists.`:'');
+  },[form.email,form.name]);
+
+  function addTerritory(){setTerritories(t=>[...t,{name:'',priority:t.length===0?'primary':'secondary'}]);}
+  function removeTerritory(i){setTerritories(t=>t.filter((_,idx)=>idx!==i));}
+  function updateTerritory(i,field,val){setTerritories(t=>t.map((x,idx)=>idx===i?{...x,[field]:val}:x));}
+
+  async function convertToFranchisee(){
+    if(!convertForm.store_name||!convertForm.store_name.trim()){
+      alert('Store Name is required. This name will be used for the franchisee\'s Ops portal login.');
+      return;
+    }
+    const primaryTerr=convertForm.territory||parseTerritories(lead?.territories).find(t=>t.priority==='primary')?.name||parseTerritories(lead?.territories)[0]?.name||'TBD';
+    if(!primaryTerr||primaryTerr==='TBD'){
+      if(!window.confirm('No territory set. Continue with "TBD"?'))return;
+    }
+    setBusy(true);
+    const{data:ph}=await sb.from('phases').select('id').order('sort_order').limit(1).single();
+    const{data:fr,error}=await sb.from('franchisees').insert([{
+      name:form.name,store_name:convertForm.store_name.trim(),email:form.email,phone:form.phone,
+      territory:primaryTerr,
+      entity_name:convertForm.entity_name||'',
+      unit_count:convertForm.unit_count||1,
+      lead_id:lead.id,
+      current_phase_id:ph?.id,
+      status:'active',
+      fa_signed_date:convertForm.fa_signed_date||new Date().toISOString().split('T')[0],
+    }]).select().single();
+    if(fr){
+      await sb.from('leads').update({
+        converted_to_franchisee:true,
+        franchisee_id:fr.id,
+        stage:'agreement_signed',
+        updated_at:new Date().toISOString(),
+      }).eq('id',lead.id);
+      await sb.from('lead_activities').insert([{
+        lead_id:lead.id,activity_type:'stage_change',
+        description:`Converted to Franchisee → ${fr.territory}`,
+        performed_by:form.assigned_to,old_stage:lead.stage,new_stage:'agreement_signed',
+      }]);
+      const{data:tasks}=await sb.from('phase_tasks').select('id').eq('phase_id',ph?.id);
+      if(tasks?.length)await sb.from('franchisee_tasks').insert(tasks.map(t=>({franchisee_id:fr.id,phase_task_id:t.id})));
+      await sb.from('franchisee_phase_dates').insert([{franchisee_id:fr.id,phase_id:ph?.id,started_at:new Date().toISOString()}]);
+      setBusy(false);setShowConvert(false);onClose();
+    }else{
+      alert('Error: '+(error?.message||'Unknown error'));
+      setBusy(false);
+    }
+  }
+
+  async function save(){
+    setBusy(true);
+    const oldStage=lead?.stage;
+    const payload={...form,territories:JSON.stringify(territories)};
+    if(isNew){
+      await sb.from('leads').insert([payload]);
+    }else{
+      await sb.from('leads').update({...payload,updated_at:new Date().toISOString()}).eq('id',lead.id);
+      if(oldStage!==form.stage){
+        // 14-day countdown starts when we move the lead to "Waiting for Sign"
+        // (i.e. the moment the FDD is actually sent out for signature).
+        const extraUpdate={};
+        if(form.stage==='waiting_for_sign'&&oldStage!=='waiting_for_sign')extraUpdate.fdd_sent_at=new Date().toISOString();
+        if(Object.keys(extraUpdate).length)await sb.from('leads').update(extraUpdate).eq('id',lead.id);
+
+        await sb.from('lead_activities').insert([{lead_id:lead.id,activity_type:'stage_change',description:`Stage: ${stageLabel(oldStage)} → ${stageLabel(form.stage)}`,performed_by:form.assigned_to,old_stage:oldStage,new_stage:form.stage}]);
+
+        if(form.stage==='agreement_signed'&&!lead.converted_to_franchisee){
+          let storeName=window.prompt('This lead is being converted to a Franchisee.\n\nEnter the STORE NAME (required — used for their Ops portal login):','');
+          if(!storeName||!storeName.trim()){
+            alert('Store Name is required to convert. Conversion cancelled — stage saved but no franchisee created. Use the "Convert to Franchisee" button to complete with a store name.');
+          }else{
+            const{data:ph}=await sb.from('phases').select('id').order('sort_order').limit(1).single();
+            const primaryTerr=territories.find(t=>t.priority==='primary')?.name||territories[0]?.name||'TBD';
+            const{data:fr}=await sb.from('franchisees').insert([{name:form.name,store_name:storeName.trim(),email:form.email,phone:form.phone,territory:primaryTerr,lead_id:lead.id,current_phase_id:ph?.id,status:'active',fa_signed_date:new Date().toISOString().split('T')[0]}]).select().single();
+            if(fr){
+              await sb.from('leads').update({converted_to_franchisee:true,franchisee_id:fr.id}).eq('id',lead.id);
+              const{data:tasks}=await sb.from('phase_tasks').select('id').eq('phase_id',ph?.id);
+              if(tasks?.length)await sb.from('franchisee_tasks').insert(tasks.map(t=>({franchisee_id:fr.id,phase_task_id:t.id})));
+              await sb.from('franchisee_phase_dates').insert([{franchisee_id:fr.id,phase_id:ph?.id,started_at:new Date().toISOString()}]);
+            }
+          }
+        }
+      }
+    }
+    setBusy(false);onClose();
+  }
+
+  async function addActivity(){
+    if(!actForm.description.trim())return;
+    await sb.from('lead_activities').insert([{lead_id:lead.id,...actForm,performed_by:form.assigned_to}]);
+    setActForm({activity_type:'note',description:''});
+    const{data}=await sb.from('lead_activities').select('*').eq('lead_id',lead.id).order('created_at',{ascending:false});
+    setActivities(data||[]);
+  }
+
+  async function addFollowup(){
+    if(!fuForm.title||!fuForm.scheduled_at)return;
+    await sb.from('lead_followups').insert([{lead_id:lead.id,...fuForm}]);
+    setFuForm({title:'',scheduled_at:'',notes:'',assigned_to:'CMO'});setShowFU(false);
+    const{data}=await sb.from('lead_followups').select('*').eq('lead_id',lead.id).order('scheduled_at');
+    setFollowups(data||[]);
+  }
+
+  async function markFUDone(id){
+    await sb.from('lead_followups').update({completed:true,completed_at:new Date().toISOString()}).eq('id',id);
+    const{data}=await sb.from('lead_followups').select('*').eq('lead_id',lead.id).order('scheduled_at');
+    setFollowups(data||[]);
+  }
+
+  async function deleteLead(){if(!window.confirm('Delete this lead?'))return;await sb.from('leads').delete().eq('id',lead.id);onClose();}
+
+  const tabs=isNew?[{k:'info',l:'Info'}]:[{k:'info',l:'Info'},{k:'activity',l:'Activity'},{k:'followup',l:'Follow-Ups'}];
+
+  return(
+    <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
+      <div className="modal modal-lg">
+        <div className="modal-header"><div className="modal-title">{isNew?'Add New Lead':form.name}</div><button className="close-btn" onClick={onClose}>×</button></div>
+        {!isNew&&<div className="tab-bar">{tabs.map(t=><button key={t.k} className={`tab-btn ${tab===t.k?'active':''}`} onClick={()=>setTab(t.k)}>{t.l}</button>)}</div>}
+        <div className="modal-body">
+          {dupWarning&&<div style={{background:'rgba(232,184,92,.1)',border:'1px solid rgba(232,184,92,.3)',borderRadius:8,padding:10,marginBottom:14,fontSize:13,color:'var(--grade-mid)'}}>⚠ {dupWarning}</div>}
+
+          {tab==='info'&&(
+            <>
+              <div className="form-row">
+                <div className="form-group"><label>Full Name</label><input value={form.name} onChange={e=>set('name',e.target.value)}/></div>
+                <div className="form-group"><label>Grade</label><select value={form.grade} onChange={e=>set('grade',e.target.value)}><option value="high">High</option><option value="mid">Mid</option><option value="low">Low</option></select></div>
+              </div>
+              <div className="form-row">
+                <div className="form-group"><label>Email</label><input type="email" value={form.email} onChange={e=>set('email',e.target.value)}/></div>
+                <div className="form-group"><label>Phone</label><input value={form.phone} onChange={e=>set('phone',e.target.value)}/></div>
+              </div>
+              <div className="form-row">
+                <div className="form-group"><label>Stage</label><select value={form.stage} onChange={e=>set('stage',e.target.value)}>{STAGES.map(s=><option key={s.key} value={s.key}>{s.label}</option>)}</select></div>
+                <div className="form-group"><label>Source</label><select value={form.source} onChange={e=>set('source',e.target.value)}>{SOURCES.map(s=><option key={s} value={s}>{s.charAt(0).toUpperCase()+s.slice(1)}</option>)}</select></div>
+              </div>
+
+              {/* Multi-territory */}
+              <div className="form-group">
+                <label>Territories</label>
+                {territories.map((t,i)=>(
+                  <div key={i} style={{display:'flex',gap:8,marginBottom:6,alignItems:'center'}}>
+                    <input value={t.name||''} onChange={e=>updateTerritory(i,'name',e.target.value)} placeholder="e.g. Dallas TX" style={{flex:2,background:'var(--panel2)',border:'1px solid var(--border2)',borderRadius:8,padding:'8px 12px',color:'var(--text)',fontFamily:'inherit',fontSize:13,outline:'none'}}/>
+                    <select value={t.priority||'primary'} onChange={e=>updateTerritory(i,'priority',e.target.value)} style={{flex:1,background:'var(--panel2)',border:'1px solid var(--border2)',borderRadius:8,padding:'8px 10px',color:'var(--text)',fontFamily:'inherit',fontSize:12,outline:'none'}}>
+                      <option value="primary">Primary</option>
+                      <option value="secondary">Secondary</option>
+                    </select>
+                    <button onClick={()=>removeTerritory(i)} style={{background:'none',border:'none',color:'var(--muted)',cursor:'pointer',fontSize:16,padding:'0 4px',flexShrink:0}}>✕</button>
+                  </div>
+                ))}
+                <button className="btn btn-ghost btn-sm" onClick={addTerritory} style={{marginTop:4}}>+ Add Territory</button>
+              </div>
+
+              <div className="form-group"><label>Assigned To</label><select value={form.assigned_to} onChange={e=>set('assigned_to',e.target.value)}>{['CMO','CEO','COO','CBO','CPO'].map(o=><option key={o}>{o}</option>)}</select></div>
+              <div className="form-row">
+                <div className="form-group"><label>Liquid Capital</label><input value={form.liquid_capital} onChange={e=>{const v=e.target.value;set('liquid_capital',v.startsWith('$')?v:'$'+v);}} onFocus={e=>{if(e.target.value==='$')e.target.setSelectionRange(1,1);}} placeholder="$1.5M"/></div>
+                <div className="form-group"><label>Net Worth</label><input value={form.net_worth} onChange={e=>{const v=e.target.value;set('net_worth',v.startsWith('$')?v:'$'+v);}} onFocus={e=>{if(e.target.value==='$')e.target.setSelectionRange(1,1);}} placeholder="$3M+"/></div>
+              </div>
+              <div className="form-group"><label>Multi-Unit Experience</label><input value={form.multi_unit_experience} onChange={e=>set('multi_unit_experience',e.target.value)} placeholder="e.g. 5 Subway units, 3 Dunkin units"/></div>
+              <div className="form-group"><label>Notes</label><textarea value={form.notes} onChange={e=>set('notes',e.target.value)}/></div>
+              {lead?.converted_to_franchisee&&(
+                <div style={{background:'rgba(95,184,122,.08)',border:'1px solid rgba(95,184,122,.25)',borderRadius:8,padding:12,fontSize:13,color:'var(--green)',display:'flex',alignItems:'center',gap:8}}>
+                  <span>✓</span><span>Already converted to Franchisee</span>
+                </div>
+              )}
+            </>
+          )}
+
+          {tab==='activity'&&(
+            <>
+              <div style={{marginBottom:16}}>
+                <div className="form-row" style={{marginBottom:8}}>
+                  <select value={actForm.activity_type} onChange={e=>setActForm(f=>({...f,activity_type:e.target.value}))} style={{background:'var(--panel2)',border:'1px solid var(--border2)',borderRadius:8,padding:'8px 12px',color:'var(--text)',fontFamily:'inherit',fontSize:13,outline:'none'}}>
+                    <option value="note">Note</option><option value="call">Call</option><option value="email">Email</option><option value="meeting">Meeting</option>
+                  </select>
+                  <input value={actForm.description} onChange={e=>setActForm(f=>({...f,description:e.target.value}))} placeholder="What happened?" style={{flex:1,background:'var(--panel2)',border:'1px solid var(--border2)',borderRadius:8,padding:'8px 12px',color:'var(--text)',fontFamily:'inherit',fontSize:13,outline:'none'}}/>
+                </div>
+                <button className="btn btn-primary btn-sm" onClick={addActivity}>Log Activity</button>
+              </div>
+              {activities.length===0&&<div style={{color:'var(--muted)',fontSize:13,textAlign:'center',padding:'20px 0'}}>No activity yet.</div>}
+              {activities.map(a=>(
+                <div key={a.id} style={{display:'flex',gap:10,padding:'9px 0',borderBottom:'1px solid var(--border)'}}>
+                  <div style={{width:8,height:8,borderRadius:'50%',background:a.activity_type==='stage_change'?'var(--green)':'var(--gold)',flexShrink:0,marginTop:5}}/>
+                  <div><div style={{fontSize:13}}>{a.description}</div><div style={{fontSize:11,color:'var(--muted)',marginTop:2}}>{a.performed_by} · {fmtDateTime(a.created_at)}</div></div>
+                </div>
+              ))}
+            </>
+          )}
+
+          {tab==='followup'&&(
+            <>
+              <button className="btn btn-primary btn-sm" style={{marginBottom:16}} onClick={()=>setShowFU(s=>!s)}>{showFU?'Cancel':'+ Schedule Follow-Up'}</button>
+              {showFU&&(
+                <div style={{background:'var(--panel2)',borderRadius:10,padding:16,marginBottom:16,border:'1px solid var(--border2)'}}>
+                  <div className="form-row">
+                    <div className="form-group"><label>Title</label><input value={fuForm.title} onChange={e=>setFuForm(f=>({...f,title:e.target.value}))}/></div>
+                    <div className="form-group"><label>Date & Time</label><input type="datetime-local" value={fuForm.scheduled_at} onChange={e=>setFuForm(f=>({...f,scheduled_at:e.target.value}))}/></div>
+                  </div>
+                  <div className="form-row">
+                    <div className="form-group"><label>Assigned To</label><select value={fuForm.assigned_to} onChange={e=>setFuForm(f=>({...f,assigned_to:e.target.value}))}>{['CMO','CEO','COO','CBO','CPO'].map(o=><option key={o}>{o}</option>)}</select></div>
+                    <div className="form-group"><label>Notes</label><input value={fuForm.notes} onChange={e=>setFuForm(f=>({...f,notes:e.target.value}))}/></div>
+                  </div>
+                  <button className="btn btn-primary btn-sm" onClick={addFollowup}>Save</button>
+                </div>
+              )}
+              {followups.length===0&&<div style={{color:'var(--muted)',fontSize:13,textAlign:'center',padding:'20px 0'}}>No follow-ups scheduled.</div>}
+              {followups.map(f=>(
+                <div key={f.id} className={`followup-item ${!f.completed&&isOverdue(f.scheduled_at)?'followup-overdue':''}`} style={f.completed?{opacity:.5}:{}}>
+                  <div className="followup-date"><div className="day">{dayOf(f.scheduled_at)}</div><div className="mon">{monShort(f.scheduled_at)}</div></div>
+                  <div className="followup-body"><div className="followup-title">{f.title}</div><div className="followup-time">{timeStr(f.scheduled_at)} · {f.assigned_to}</div>{f.notes&&<div style={{fontSize:12,color:'var(--muted)'}}>{f.notes}</div>}</div>
+                  {!f.completed&&<button className="btn btn-ghost btn-sm" onClick={()=>markFUDone(f.id)}>Done</button>}
+                  {f.completed&&<span style={{fontSize:12,color:'var(--green)'}}>✓</span>}
+                </div>
+              ))}
+            </>
+          )}
+        </div>
+        {/* Convert to Franchisee Panel */}
+        {!isNew&&!lead?.converted_to_franchisee&&showConvert&&(
+          <div style={{padding:'16px 24px',borderTop:'1px solid var(--border)',background:'rgba(95,184,122,.04)'}}>
+            <div style={{fontWeight:700,fontSize:14,color:'var(--green)',marginBottom:12}}>Convert to Franchisee</div>
+            <div className="form-row" style={{marginBottom:10}}>
+              <div className="form-group" style={{marginBottom:0}}>
+                <label>Store Name <span style={{color:'var(--red)'}}>*</span></label>
+                <input value={convertForm.store_name||''} onChange={e=>setConvertForm(f=>({...f,store_name:e.target.value}))} placeholder="e.g. Ugly Donuts Dallas"/>
+                <div style={{fontSize:10,color:'var(--muted)',marginTop:3}}>Used for Ops portal login. Required.</div>
+              </div>
+              <div className="form-group" style={{marginBottom:0}}>
+                <label>Territory</label>
+                <input value={convertForm.territory} onChange={e=>setConvertForm(f=>({...f,territory:e.target.value}))}
+                  placeholder={parseTerritories(lead?.territories).find(t=>t.priority==='primary')?.name||'e.g. Dallas TX'}/>
+              </div>
+              <div className="form-group" style={{marginBottom:0}}>
+                <label>FA Signed Date</label>
+                <input type="date" value={convertForm.fa_signed_date} onChange={e=>setConvertForm(f=>({...f,fa_signed_date:e.target.value}))}/>
+              </div>
+            </div>
+            <div className="form-row" style={{marginBottom:10}}>
+              <div className="form-group" style={{marginBottom:0}}>
+                <label>Entity Name (LLC)</label>
+                <input value={convertForm.entity_name} onChange={e=>setConvertForm(f=>({...f,entity_name:e.target.value}))} placeholder="Optional"/>
+              </div>
+              <div className="form-group" style={{marginBottom:0}}>
+                <label>Units in Agreement</label>
+                <input type="number" min={1} value={convertForm.unit_count} onChange={e=>setConvertForm(f=>({...f,unit_count:parseInt(e.target.value)||1}))}/>
+              </div>
+            </div>
+            <div style={{display:'flex',gap:8}}>
+              <button className="btn btn-primary" onClick={convertToFranchisee} disabled={busy||!convertForm.store_name?.trim()}>{busy?'Converting...':'Confirm Convert →'}</button>
+              <button className="btn btn-ghost btn-sm" onClick={()=>setShowConvert(false)}>Cancel</button>
+            </div>
+          </div>
+        )}
+        <div className="modal-footer">
+          {!isNew&&<button className="btn btn-danger btn-sm" onClick={deleteLead}>Delete</button>}
+          {!isNew&&!lead?.converted_to_franchisee&&(
+            <button className="btn btn-sm" onClick={()=>setShowConvert(s=>!s)}
+              style={{background:'rgba(95,184,122,.15)',color:'var(--green)',border:'1px solid rgba(95,184,122,.3)',borderRadius:6,padding:'5px 12px',fontFamily:'inherit',fontSize:12,fontWeight:600,cursor:'pointer'}}>
+              {showConvert?'Cancel':'⇄ Convert to Franchisee'}
+            </button>
+          )}
+          {lead?.converted_to_franchisee&&<span style={{fontSize:12,color:'var(--green)'}}>✓ Franchisee</span>}
+          <div style={{flex:1}}/>
+          <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
+          <button className="btn btn-primary" onClick={save} disabled={busy||!form.name}>{busy?'Saving...':isNew?'Add Lead':'Save Changes'}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── FOLLOW-UPS ────────────────────────────────────────────
+function FollowUps(){
+  const [followups,setFollowups]=useState([]);
+  const [loading,setLoading]=useState(true);
+  const [filter,setFilter]=useState('pending');
+  async function load(){setLoading(true);let q=sb.from('lead_followups').select('*,leads(name,grade)').order('scheduled_at');if(filter==='pending')q=q.eq('completed',false);if(filter==='done')q=q.eq('completed',true);const{data}=await q;setFollowups(data||[]);setLoading(false);}
+  useEffect(()=>{load();},[filter]);
+  async function markDone(id){await sb.from('lead_followups').update({completed:true,completed_at:new Date().toISOString()}).eq('id',id);load();}
+  const groups=useMemo(()=>{const g={};followups.forEach(f=>{const d=new Date(f.scheduled_at).toDateString();if(!g[d])g[d]=[];g[d].push(f);});return g;},[followups]);
+  return(
+    <>
+      <div className="page-header">
+        <div><div className="page-title">Follow-Ups</div><div className="page-sub">Scheduled lead touchpoints</div></div>
+        <div style={{display:'flex',gap:8}}>{['pending','done','all'].map(k=><button key={k} className={`btn btn-sm ${filter===k?'btn-primary':'btn-ghost'}`} onClick={()=>setFilter(k)}>{k.charAt(0).toUpperCase()+k.slice(1)}</button>)}</div>
+      </div>
+      <div className="content">
+        {loading?<div className="loading">Loading...</div>:Object.keys(groups).length===0?(
+          <div className="empty"><div className="empty-icon">◷</div><div className="empty-title">No follow-ups</div></div>
+        ):Object.entries(groups).map(([date,items])=>(
+          <div key={date} style={{marginBottom:24}}>
+            <div style={{fontSize:12,fontWeight:700,color:'var(--muted)',letterSpacing:'.08em',textTransform:'uppercase',marginBottom:10}}>
+              {new Date(date).toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'})}
+              {new Date(date)<new Date()&&!items.every(i=>i.completed)&&<span style={{marginLeft:8,color:'var(--red)',fontWeight:700}}>OVERDUE</span>}
+            </div>
+            {items.map(f=>(
+              <div key={f.id} className={`followup-item ${!f.completed&&isOverdue(f.scheduled_at)?'followup-overdue':''}`} style={f.completed?{opacity:.5}:{}}>
+                <div className="followup-date"><div className="day">{dayOf(f.scheduled_at)}</div><div className="mon">{monShort(f.scheduled_at)}</div></div>
+                <div className="followup-body">
+                  <div className="followup-title">{f.title}</div>
+                  <div className="followup-lead">{f.leads?.name}{f.leads?.grade&&<span className={`badge badge-${f.leads.grade}`} style={{marginLeft:6}}>{f.leads.grade}</span>}</div>
+                  <div className="followup-time">{timeStr(f.scheduled_at)} · {f.assigned_to}</div>
+                </div>
+                {!f.completed&&<button className="btn btn-primary btn-sm" onClick={()=>markDone(f.id)}>Mark Done</button>}
+                {f.completed&&<span style={{fontSize:12,color:'var(--green)'}}>✓ Done</span>}
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+    </>
+  );
+}
+
+// ── FRANCHISEE TRACKER ────────────────────────────────────
+function FranchiseeTracker(){
+  const [franchisees,setFranchisees]=useState([]);
+  const [phases,setPhases]=useState([]);
+  const [allTasks,setAllTasks]=useState([]);
+  const [loading,setLoading]=useState(true);
+  const [selected,setSelected]=useState(null);
+  const [filterPhase,setFilterPhase]=useState('all');
+  const [filterStatus,setFilterStatus]=useState('active_open');
+  const [showAdd,setShowAdd]=useState(false);
+  const [search,setSearch]=useState('');
+
+  async function load(){
+    setLoading(true);
+    const[fRes,phRes,ptRes]=await Promise.all([
+      sb.from('franchisees').select('*').order('created_at'),
+      sb.from('phases').select('*').order('sort_order'),
+      sb.from('phase_tasks').select('*').order('sort_order'),
+    ]);
+    setFranchisees(fRes.data||[]);setPhases(phRes.data||[]);setAllTasks(ptRes.data||[]);setLoading(false);
+  }
+  useEffect(()=>{load();},[]);
+
+  const filtered=useMemo(()=>franchisees.filter(f=>{
+    const q=search.toLowerCase();
+    const matchSearch=!q||
+      f.name?.toLowerCase().includes(q)||
+      f.store_name?.toLowerCase().includes(q)||
+      f.territory?.toLowerCase().includes(q)||
+      f.email?.toLowerCase().includes(q);
+    const matchPhase=filterPhase==='all'||f.current_phase_id===filterPhase;
+    const matchStatus=
+      filterStatus==='all'?true:
+      filterStatus==='active_open'?(f.status==='active'||f.status==='open'||f.status==='soft_open'):
+      f.status===filterStatus;
+    return matchSearch&&matchPhase&&matchStatus;
+  }),[franchisees,filterPhase,filterStatus,search]);
+
+  return(
+    <>
+      <div className="page-header">
+        <div><div className="page-title">Franchisee Tracker</div><div className="page-sub">{franchisees.length} total</div></div>
+        <button className="btn btn-primary" onClick={()=>setShowAdd(true)}>+ Add Franchisee</button>
+      </div>
+      <div className="content">
+        <div className="filter-bar">
+          <input placeholder="Search name, store, territory..." value={search} onChange={e=>setSearch(e.target.value)} style={{minWidth:240}}/>
+          <select value={filterPhase} onChange={e=>setFilterPhase(e.target.value)}>
+            <option value="all">All Phases</option>
+            {phases.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}
+          </select>
+          <select value={filterStatus} onChange={e=>setFilterStatus(e.target.value)}>
+            <option value="active_open">Active + Open</option>
+            <option value="active">In Development</option>
+            <option value="open">Open & Operating</option>
+            <option value="archived">Archived</option>
+            <option value="all">All</option>
+          </select>
+          <span style={{marginLeft:'auto',fontSize:12,color:'var(--muted)'}}>{filtered.length} franchisees</span>
+        </div>
+        {loading?<div className="loading">Loading...</div>:filtered.length===0?(
+          <div className="empty"><div className="empty-icon">◍</div><div className="empty-title">No franchisees yet</div><div className="empty-sub">Franchisees appear here when leads sign their FA</div></div>
+        ):(
+          <div className="card-grid card-grid-3">
+            {filtered.map(f=>{
+              const phase=phases.find(p=>p.id===f.current_phase_id);
+              const phIdx=phases.indexOf(phase);
+              const days=f.phase_due_date?daysUntil(f.phase_due_date):null;
+              return(
+                <div key={f.id} className="franchisee-card" onClick={()=>setSelected(f)}>
+                  <div style={{display:'flex',alignItems:'center',gap:11,marginBottom:10}}>
+                    <span className={`pava pava-${(f.name||'').length%4}`} style={{width:32,height:32,fontSize:11.5,fontWeight:800,borderRadius:'50%',display:'inline-flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>{(f.store_name||f.name||'?').split(/\s+/).map(w=>w[0]).slice(0,2).join('').toUpperCase()}</span>
+                    <span style={{minWidth:0,flex:1,display:'flex',flexDirection:'column',gap:1}}>
+                      <span style={{display:'flex',alignItems:'center',gap:8,minWidth:0}}>
+                        <span style={{fontSize:14.5,fontWeight:800,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{f.store_name||f.name}</span>
+                        {f.status==='archived'&&<span className="badge" style={{background:'#EEEAE0',color:'var(--muted)'}}>Archived</span>}
+                      </span>
+                      <span style={{fontSize:11.5,color:'var(--muted)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{f.name}{f.territory?' · '+f.territory:''}</span>
+                    </span>
+                    {days!==null&&days<=7&&<span style={{fontSize:11,fontWeight:800,color:days<0?'var(--red)':'var(--gold-dim)',flexShrink:0}}>{days<0?`${Math.abs(days)}d late`:days===0?'Due today':`${days}d`}</span>}
+                  </div>
+                  <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:10,flexWrap:'wrap'}}>
+                    <span style={{fontSize:11.5,fontWeight:800,color:'#fff',background:phase?.color||'var(--gold-dim)',padding:'2px 9px',borderRadius:999}}>{phIdx>=0?`${phIdx+1} · `:''}{phase?.name||'No Phase'}</span>
+                    {f.email&&<a href={`mailto:${f.email}`} onClick={e=>e.stopPropagation()} style={{fontSize:11,color:'var(--blue)',textDecoration:'none'}}>✉ Email</a>}
+                    {f.phone&&<a href={`tel:${f.phone}`} onClick={e=>e.stopPropagation()} style={{fontSize:11,color:'var(--green)',textDecoration:'none'}}>📞 Call</a>}
+                  </div>
+                  <FranchiseeProgress franchisee={f}/>
+                  {days!==null&&(
+                    <div style={{marginTop:8,fontSize:11,color:days<0?'var(--red)':days<=7?'var(--orange)':'var(--muted)'}}>
+                      Due: {fmtDate(f.phase_due_date)} {days<0?'· Overdue':days===0?'· Today':days<=7?`· ${days}d`:''}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+      {selected&&<FranchiseeModal franchisee={selected} phases={phases} allTasks={allTasks} onClose={()=>{setSelected(null);load();}}/>}
+      {showAdd&&<AddFranchiseeModal phases={phases} allTasks={allTasks} onClose={()=>{setShowAdd(false);load();}}/>}
+    </>
+  );
+}
+
+function FranchiseeProgress({franchisee}){
+  const [p,setP]=useState({done:0,total:0});
+  useEffect(()=>{sb.from('franchisee_tasks').select('completed').eq('franchisee_id',franchisee.id).then(r=>{const t=r.data||[];setP({done:t.filter(x=>x.completed).length,total:t.length});});},[franchisee.id]);
+  const pct=p.total?Math.round(p.done/p.total*100):0;
+  return(
+    <div>
+      <div style={{display:'flex',justifyContent:'space-between',marginBottom:4,fontSize:12,color:'var(--muted)'}}><span>{p.done}/{p.total} tasks</span><span>{pct}%</span></div>
+      <div className="progress-bar"><div className="progress-fill" style={{width:`${pct}%`}}/></div>
+    </div>
+  );
+}
+
+function AddFranchiseeModal({phases,allTasks,onClose}){
+  const [form,setForm]=useState({name:'',store_name:'',email:'',phone:'',territory:'',entity_name:'',fa_signed_date:'',unit_count:1});
+  const [busy,setBusy]=useState(false);
+  const set=(k,v)=>setForm(f=>({...f,[k]:v}));
+  async function save(){
+    if(!form.name||!form.territory)return;setBusy(true);
+    const firstPhase=phases[0];
+    const{data:fr}=await sb.from('franchisees').insert([{...form,current_phase_id:firstPhase?.id,status:'active'}]).select().single();
+    if(fr&&firstPhase){
+      const tasks=allTasks.filter(t=>t.phase_id===firstPhase.id);
+      if(tasks.length)await sb.from('franchisee_tasks').insert(tasks.map(t=>({franchisee_id:fr.id,phase_task_id:t.id})));
+      await sb.from('franchisee_phase_dates').insert([{franchisee_id:fr.id,phase_id:firstPhase.id,started_at:new Date().toISOString()}]);
+    }
+    setBusy(false);onClose();
+  }
+  return(
+    <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
+      <div className="modal">
+        <div className="modal-header"><div className="modal-title">Add Franchisee</div><button className="close-btn" onClick={onClose}>×</button></div>
+        <div className="modal-body">
+          <div className="form-row"><div className="form-group"><label>Franchisee Name</label><input value={form.name} onChange={e=>set('name',e.target.value)} placeholder="e.g. Lawrence Kourie"/></div><div className="form-group"><label>Store Name</label><input value={form.store_name} onChange={e=>set('store_name',e.target.value)} placeholder="e.g. Ugly Donuts Dallas"/></div></div>
+          <div className="form-row"><div className="form-group"><label>Territory</label><input value={form.territory} onChange={e=>set('territory',e.target.value)} placeholder="e.g. Dallas TX"/></div><div className="form-group"><label>Email</label><input value={form.email} onChange={e=>set('email',e.target.value)}/></div></div>
+          <div className="form-row"><div className="form-group"><label>Email</label><input value={form.email} onChange={e=>set('email',e.target.value)}/></div><div className="form-group"><label>Phone</label><input value={form.phone} onChange={e=>set('phone',e.target.value)}/></div></div>
+          <div className="form-row"><div className="form-group"><label>Entity Name</label><input value={form.entity_name} onChange={e=>set('entity_name',e.target.value)}/></div><div className="form-group"><label>Units in Agreement</label><input type="number" value={form.unit_count} onChange={e=>set('unit_count',e.target.value)} min={1}/></div></div>
+          <div className="form-group"><label>FA Signed Date</label><input type="date" value={form.fa_signed_date} onChange={e=>set('fa_signed_date',e.target.value)}/></div>
+        </div>
+        <div className="modal-footer"><button className="btn btn-ghost" onClick={onClose}>Cancel</button><button className="btn btn-primary" onClick={save} disabled={busy||!form.name||!form.territory}>{busy?'Saving...':'Add'}</button></div>
+      </div>
+    </div>
+  );
+}
+
+// ── FRANCHISEE DETAIL MODAL ───────────────────────────────
+function FranchiseeModal({franchisee,phases,allTasks,onClose}){
+  const [editOpen,setEditOpen]=useState(false);
+  const [ftasks,setFtasks]=useState([]);
+  const [phaseDates,setPhaseDates]=useState([]);
+  const [meetings,setMeetings]=useState([]);
+  const [loading,setLoading]=useState(true);
+  const [currentPhase,setCurrentPhase]=useState(franchisee.current_phase_id);
+  const [showDatePicker,setShowDatePicker]=useState(false);
+  const [dateForm,setDateForm]=useState({due_date:'',notes:''});
+  const [tab,setTab]=useState('checklist');
+  const [showMeeting,setShowMeeting]=useState(false);
+  const [meetForm,setMeetForm]=useState({activity_type:'note',description:'',performed_by:'COO'});
+  const [taskNote,setTaskNote]=useState({id:null,text:''});
+
+  async function load(){
+    setLoading(true);
+    const[ft,pd,mt]=await Promise.all([
+      sb.from('franchisee_tasks').select('*,phase_tasks(*)').eq('franchisee_id',franchisee.id),
+      sb.from('franchisee_phase_dates').select('*,phases(name,color)').eq('franchisee_id',franchisee.id),
+      sb.from('franchisee_activities').select('*').eq('franchisee_id',franchisee.id).order('created_at',{ascending:false}),
+    ]);
+    setFtasks(ft.data||[]);setPhaseDates(pd.data||[]);setMeetings(mt.data||[]);setLoading(false);
+  }
+  useEffect(()=>{load();},[]);
+
+  async function toggleTask(ft){
+    const done=!ft.completed;
+    await sb.from('franchisee_tasks').update({completed:done,completed_at:done?new Date().toISOString():null,completed_by:'HQ'}).eq('id',ft.id);
+    load();
+  }
+
+  async function saveTaskNote(ftId){
+    await sb.from('franchisee_tasks').update({notes:taskNote.text}).eq('id',ftId);
+    setTaskNote({id:null,text:''});load();
+  }
+
+  async function savePhaseDate(){
+    if(!dateForm.due_date)return;
+    await sb.from('franchisee_phase_dates').upsert([{franchisee_id:franchisee.id,phase_id:currentPhase,...dateForm}],{onConflict:'franchisee_id,phase_id'});
+    await sb.from('franchisees').update({phase_due_date:dateForm.due_date}).eq('id',franchisee.id);
+    setShowDatePicker(false);load();
+  }
+
+  async function addMeeting(){
+    if(!meetForm.description.trim())return;
+    await sb.from('franchisee_activities').insert([{franchisee_id:franchisee.id,...meetForm}]);
+    setMeetForm({activity_type:'note',description:'',performed_by:'COO'});setShowMeeting(false);load();
+  }
+
+  async function advancePhase(){
+    const idx=phases.findIndex(p=>p.id===currentPhase);
+    if(idx<phases.length-1){
+      const next=phases[idx+1];
+      const tasks=allTasks.filter(t=>t.phase_id===next.id);
+      const existing=ftasks.map(t=>t.phase_task_id);
+      const toAdd=tasks.filter(t=>!existing.includes(t.id));
+      if(toAdd.length)await sb.from('franchisee_tasks').insert(toAdd.map(t=>({franchisee_id:franchisee.id,phase_task_id:t.id})));
+      const now=new Date().toISOString();
+      await sb.from('franchisee_phase_dates').upsert([{franchisee_id:franchisee.id,phase_id:currentPhase,completed_at:now}],{onConflict:'franchisee_id,phase_id'});
+      await sb.from('franchisee_phase_dates').upsert([{franchisee_id:franchisee.id,phase_id:next.id,started_at:now}],{onConflict:'franchisee_id,phase_id'});
+      // If advancing INTO a "Soft Opening" phase, mark as soft_open so it can be added to Ops now.
+      const enteringSoftOpen=(next.name||'').toLowerCase().includes('soft open');
+      const update={current_phase_id:next.id,phase_due_date:null,updated_at:now};
+      if(enteringSoftOpen)update.status='soft_open';
+      const{error:advErr}=await sb.from('franchisees').update(update).eq('id',franchisee.id);
+      if(advErr){alert('Could not advance phase: '+advErr.message+'\nPlease try again.');return;}
+      if(enteringSoftOpen){
+        alert(`${franchisee.store_name||franchisee.name} has entered Soft Opening and is now active for Ops.\n\nYou can now activate their Ops portal account: go to Franchise Ops → Accounts, where this store will appear under "needs Ops account activation."`);
+      }
+      setCurrentPhase(next.id);setDateForm({due_date:'',notes:''});load();
+    }else{
+      // Final phase complete = full Grand Opening
+      await sb.from('franchisees').update({status:'open',updated_at:new Date().toISOString()}).eq('id',franchisee.id);
+      onClose();
+    }
+  }
+
+  const phase=phases.find(p=>p.id===currentPhase);
+  const phaseIdx=phases.findIndex(p=>p.id===currentPhase);
+  const phaseTasks=ftasks.filter(ft=>ft.phase_tasks?.phase_id===currentPhase);
+  const doneTasks=phaseTasks.filter(t=>t.completed).length;
+  const allDone=phaseTasks.length>0&&doneTasks===phaseTasks.length;
+  const currentPD=phaseDates.find(pd=>pd.phase_id===currentPhase);
+  const byOwner={};phaseTasks.forEach(ft=>{const o=ft.phase_tasks?.owner||'HQ';if(!byOwner[o])byOwner[o]=[];byOwner[o].push(ft);});
+
+  // Phase duration stats
+  const completedPhases=phaseDates.filter(pd=>pd.completed_at&&pd.started_at);
+
+  const meetIcons={note:'◎',call:'📞',email:'✉',meeting:'🤝','site_visit':'📍','inspection':'🔍'};
+
+  return(
+    <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
+      <div className="modal modal-xl">
+        <div className="modal-header">
+          <div>
+            <div className="modal-title">{franchisee.store_name||franchisee.name}</div>
+            <div style={{fontSize:12,color:'var(--muted)',marginTop:2,display:'flex',gap:12,rowGap:4,flexWrap:'wrap',alignItems:'center'}}>
+              {franchisee.store_name&&<span style={{color:'var(--muted)'}}>{franchisee.name}</span>}
+              <span>{franchisee.territory}</span>
+              {franchisee.email&&<a href={`mailto:${franchisee.email}`} style={{color:'var(--blue)',fontSize:12,textDecoration:'none'}}>✉ {franchisee.email}</a>}
+              {franchisee.phone&&<a href={`tel:${franchisee.phone}`} style={{color:'var(--green)',fontSize:12,textDecoration:'none'}}>📞 {franchisee.phone}</a>}
+            </div>
+          </div>
+          <button className="close-btn" onClick={onClose}>×</button>
+        </div>
+
+        {/* Phase timeline */}
+        <div style={{padding:'16px 24px',borderBottom:'1px solid var(--border)',overflowX:'auto'}}>
+          <div style={{display:'flex',gap:4,minWidth:phases.length*90}}>
+            {phases.map((p,i)=>{
+              const isActive=p.id===currentPhase;const isDone=i<phaseIdx;
+              const pd=phaseDates.find(d=>d.phase_id===p.id);
+              const dur=pd?.started_at&&pd?.completed_at?daysBetween(pd.started_at,pd.completed_at):null;
+              return(
+                <div key={p.id} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:3}}>
+                  <div style={{width:28,height:28,borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',background:isDone?'var(--green)':isActive?p.color:'var(--border2)',color:isDone||isActive?'var(--black)':'var(--muted)',fontSize:11,fontWeight:700,boxShadow:isActive?`0 0 0 4px ${p.color}33`:'none'}}>{isDone?'✓':i+1}</div>
+                  <div style={{fontSize:9,color:isActive?p.color:isDone?'var(--green)':'var(--muted)',textAlign:'center',lineHeight:1.3,maxWidth:72}}>{p.name}</div>
+                  {dur!==null&&<div style={{fontSize:8,color:'var(--muted2)'}}>{dur}d</div>}
+                  {pd?.due_date&&!pd?.completed_at&&<div style={{fontSize:8,color:'var(--muted2)'}}>{fmtDate(pd.due_date)}</div>}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Tabs */}
+        <div className="tab-bar">
+          {[{k:'checklist',l:'Checklist'},{k:'notes',l:`Notes (${meetings.length})`},{k:'timeline',l:'Timeline'}].map(t=>(
+            <button key={t.k} className={`tab-btn ${tab===t.k?'active':''}`} onClick={()=>setTab(t.k)}>{t.l}</button>
+          ))}
+        </div>
+
+        <div className="modal-body">
+          {tab==='checklist'&&(
+            <>
+              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:16}}>
+                <div>
+                  <div style={{fontSize:13,color:'var(--muted)',marginBottom:2}}>Current Phase</div>
+                  <div style={{fontSize:18,fontWeight:700,color:phase?.color||'var(--gold)'}}>{phase?.name||'Complete'}</div>
+                </div>
+                <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:8}}>
+                  <div style={{fontSize:13,color:'var(--muted)'}}>{doneTasks}/{phaseTasks.length} tasks</div>
+                  {currentPD?.due_date&&(
+                    <div style={{fontSize:12,color:daysUntil(currentPD.due_date)<0?'var(--red)':daysUntil(currentPD.due_date)<=7?'var(--orange)':'var(--muted)'}}>
+                      Due: {fmtDate(currentPD.due_date)}{daysUntil(currentPD.due_date)<0&&<span style={{color:'var(--red)',fontWeight:700,marginLeft:4}}>OVERDUE</span>}
+                    </div>
+                  )}
+                  <button className="btn btn-ghost btn-sm" onClick={()=>setShowDatePicker(s=>!s)}>{currentPD?.due_date?'Change Due Date':'Set Due Date'}</button>
+                </div>
+              </div>
+
+              {showDatePicker&&(
+                <div style={{background:'var(--panel2)',borderRadius:10,padding:16,marginBottom:16,border:'1px solid var(--border2)'}}>
+                  <div className="form-row">
+                    <div className="form-group"><label>Due Date for "{phase?.name}"</label><input type="date" value={dateForm.due_date} onChange={e=>setDateForm(f=>({...f,due_date:e.target.value}))}/></div>
+                    <div className="form-group"><label>Notes</label><input value={dateForm.notes} onChange={e=>setDateForm(f=>({...f,notes:e.target.value}))}/></div>
+                  </div>
+                  <div style={{display:'flex',gap:8}}><button className="btn btn-primary btn-sm" onClick={savePhaseDate}>Save Date</button><button className="btn btn-ghost btn-sm" onClick={()=>setShowDatePicker(false)}>Cancel</button></div>
+                </div>
+              )}
+
+              <div className="progress-bar" style={{marginBottom:16}}><div className="progress-fill" style={{width:`${phaseTasks.length?doneTasks/phaseTasks.length*100:0}%`}}/></div>
+
+              {loading?<div className="loading">Loading...</div>:Object.entries(byOwner).map(([owner,tasks])=>(
+                <div key={owner} style={{marginBottom:16}}>
+                  <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8}}>
+                    <span className={`owner-badge owner-${owner}`}>{owner}</span>
+                    <span style={{fontSize:12,color:'var(--muted)'}}>{tasks.filter(t=>t.completed).length}/{tasks.length}</span>
+                  </div>
+                  {tasks.map(ft=>(
+                    <div key={ft.id}>
+                      <div className="task-item">
+                        <div className={`task-check ${ft.completed?'done':''}`} onClick={()=>toggleTask(ft)}/>
+                        <span className={`task-title ${ft.completed?'done':''}`}>{ft.phase_tasks?.title}</span>
+                        <div style={{display:'flex',alignItems:'center',gap:6,marginLeft:'auto',flexShrink:0}}>
+                          {ft.completed&&<span style={{fontSize:11,color:'var(--muted)',whiteSpace:'nowrap'}}>{fmtDate(ft.completed_at)}</span>}
+                          <button onClick={()=>setTaskNote(taskNote.id===ft.id?{id:null,text:''}:{id:ft.id,text:ft.notes||''})}
+                            style={{background:'none',border:'none',cursor:'pointer',fontSize:12,color:ft.notes?'var(--gold)':'var(--muted)',padding:'0 2px'}}>
+                            {ft.notes?'📝':'+ note'}
+                          </button>
+                        </div>
+                      </div>
+                      {taskNote.id===ft.id&&(
+                        <div style={{paddingLeft:28,paddingBottom:8,display:'flex',gap:8}}>
+                          <input value={taskNote.text} onChange={e=>setTaskNote(n=>({...n,text:e.target.value}))}
+                            placeholder="Add note for this task..." style={{flex:1,background:'var(--panel2)',border:'1px solid var(--border2)',borderRadius:6,padding:'6px 10px',color:'var(--text)',fontFamily:'inherit',fontSize:12,outline:'none'}}/>
+                          <button className="btn btn-primary btn-sm" onClick={()=>saveTaskNote(ft.id)}>Save</button>
+                        </div>
+                      )}
+                      {ft.notes&&taskNote.id!==ft.id&&<div style={{paddingLeft:28,paddingBottom:6,fontSize:11,color:'var(--muted)',fontStyle:'italic'}}>{ft.notes}</div>}
+                    </div>
+                  ))}
+                </div>
+              ))}
+
+              {/* Mark All Complete button — always visible when tasks exist */}
+              {phaseTasks.length>0&&!allDone&&(
+                <div style={{marginTop:16,textAlign:'right'}}>
+                  <button className="btn btn-ghost btn-sm" onClick={async()=>{
+                    if(!window.confirm('Mark ALL tasks in this phase as complete?'))return;
+                    const incomplete=phaseTasks.filter(ft=>!ft.completed);
+                    await Promise.all(incomplete.map(ft=>
+                      sb.from('franchisee_tasks').update({completed:true,completed_at:new Date().toISOString(),completed_by:'HQ'}).eq('id',ft.id)
+                    ));
+                    load();
+                  }} style={{color:'var(--gold)',borderColor:'rgba(204,156,58,.3)'}}>
+                    ✓ Mark All Complete
+                  </button>
+                </div>
+              )}
+
+              {allDone&&(
+                <div style={{marginTop:20,padding:16,background:'rgba(95,184,122,.1)',border:'1px solid rgba(95,184,122,.3)',borderRadius:10,textAlign:'center'}}>
+                  {phaseIdx>=phases.length-1&&franchisee.status==='open'?(
+                    <div style={{fontSize:14,fontWeight:700,color:'var(--green)'}}>✓ All phases complete · Store is Open</div>
+                  ):(
+                    <>
+                      <div style={{fontSize:14,fontWeight:700,color:'var(--green)',marginBottom:8}}>All tasks complete for "{phase?.name}"</div>
+                      <button className="btn btn-primary" onClick={advancePhase}>
+                        {phaseIdx<phases.length-1?`Advance to Phase ${phaseIdx+2}: ${phases[phaseIdx+1]?.name} →`:'Mark as Open'}
+                      </button>
+                    </>
+                  )}
+                </div>
+              )}
+            </>
+          )}
+
+          {tab==='notes'&&(
+            <>
+              <button className="btn btn-primary btn-sm" style={{marginBottom:16}} onClick={()=>setShowMeeting(s=>!s)}>{showMeeting?'Cancel':'+ Log Activity'}</button>
+              {showMeeting&&(
+                <div style={{background:'var(--panel2)',borderRadius:10,padding:16,marginBottom:16,border:'1px solid var(--border2)'}}>
+                  <div className="form-row">
+                    <div className="form-group">
+                      <label>Type</label>
+                      <select value={meetForm.activity_type} onChange={e=>setMeetForm(f=>({...f,activity_type:e.target.value}))} style={{background:'var(--panel)',border:'1px solid var(--border2)',borderRadius:8,padding:'9px 12px',color:'var(--text)',fontFamily:'inherit',fontSize:13,outline:'none',width:'100%'}}>
+                        <option value="note">Note</option>
+                        <option value="call">Call</option>
+                        <option value="meeting">Meeting</option>
+                        <option value="site_visit">Site Visit</option>
+                        <option value="inspection">Inspection</option>
+                        <option value="email">Email</option>
+                      </select>
+                    </div>
+                    <div className="form-group"><label>Performed By</label><select value={meetForm.performed_by} onChange={e=>setMeetForm(f=>({...f,performed_by:e.target.value}))} style={{background:'var(--panel)',border:'1px solid var(--border2)',borderRadius:8,padding:'9px 12px',color:'var(--text)',fontFamily:'inherit',fontSize:13,outline:'none',width:'100%'}}>{TITLES.map(t=><option key={t}>{t}</option>)}</select></div>
+                  </div>
+                  <div className="form-group"><label>Notes</label><textarea value={meetForm.description} onChange={e=>setMeetForm(f=>({...f,description:e.target.value}))} placeholder="What happened? Any issues, decisions, next steps..." style={{width:'100%',background:'var(--panel)',border:'1px solid var(--border2)',borderRadius:8,padding:'9px 12px',color:'var(--text)',fontFamily:'inherit',fontSize:13,outline:'none',minHeight:80,resize:'vertical'}}/></div>
+                  <button className="btn btn-primary btn-sm" onClick={addMeeting}>Save</button>
+                </div>
+              )}
+              {meetings.length===0&&<div style={{color:'var(--muted)',fontSize:13,textAlign:'center',padding:'30px 0'}}>No activity logged yet.</div>}
+              {meetings.map(m=>(
+                <div key={m.id} style={{display:'flex',gap:12,padding:'12px 0',borderBottom:'1px solid var(--border)'}}>
+                  <div style={{width:28,height:28,borderRadius:'50%',background:'var(--panel2)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:13,flexShrink:0}}>{meetIcons[m.activity_type]||'◎'}</div>
+                  <div>
+                    <div style={{fontSize:11,fontWeight:700,color:'var(--gold)',textTransform:'uppercase',letterSpacing:'.06em',marginBottom:3}}>{m.activity_type?.replace('_',' ')} · {m.performed_by}</div>
+                    <div style={{fontSize:13,lineHeight:1.5}}>{m.description}</div>
+                    <div style={{fontSize:11,color:'var(--muted)',marginTop:4}}>{fmtDateTime(m.created_at)}</div>
+                  </div>
+                </div>
+              ))}
+            </>
+          )}
+
+          {tab==='timeline'&&(
+            <>
+              <div style={{fontSize:13,color:'var(--muted)',marginBottom:16}}>Phase duration tracking — how long each phase took.</div>
+              {phases.map((p,i)=>{
+                const pd=phaseDates.find(d=>d.phase_id===p.id);
+                const isActive=p.id===currentPhase;
+                const isDone=i<phaseIdx;
+                const dur=pd?.started_at&&pd?.completed_at?daysBetween(pd.started_at,pd.completed_at):null;
+                const active_dur=pd?.started_at&&!pd?.completed_at?daysBetween(pd.started_at,new Date().toISOString()):null;
+                return(
+                  <div key={p.id} style={{display:'flex',alignItems:'center',gap:14,padding:'10px 0',borderBottom:'1px solid var(--border)'}}>
+                    <div style={{width:24,height:24,borderRadius:'50%',background:isDone?'var(--green)':isActive?p.color:'var(--border2)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:10,fontWeight:700,color:isDone||isActive?'var(--black)':'var(--muted)',flexShrink:0}}>{isDone?'✓':i+1}</div>
+                    <div style={{flex:1}}>
+                      <div style={{fontSize:13,fontWeight:600,color:isActive?p.color:isDone?'var(--text)':'var(--muted)'}}>{p.name}</div>
+                      {pd?.started_at&&<div style={{fontSize:11,color:'var(--muted)',marginTop:2}}>Started: {fmtDate(pd.started_at)}</div>}
+                    </div>
+                    <div style={{textAlign:'right'}}>
+                      {dur!==null&&<div style={{fontSize:13,fontWeight:700,color:'var(--green)'}}>{dur} days</div>}
+                      {active_dur!==null&&<div style={{fontSize:13,fontWeight:700,color:p.color}}>{active_dur} days in progress</div>}
+                      {pd?.due_date&&!pd?.completed_at&&<div style={{fontSize:11,color:daysUntil(pd.due_date)<0?'var(--red)':'var(--muted)'}}>Due: {fmtDate(pd.due_date)}</div>}
+                      {!pd&&<div style={{fontSize:12,color:'var(--muted2)'}}>Not started</div>}
+                    </div>
+                  </div>
+                );
+              })}
+            </>
+          )}
+        </div>
+        <div className="modal-footer">
+          {franchisee.status!=='archived'&&(
+            <button className="btn btn-sm" onClick={async()=>{
+              if(!window.confirm(`Archive ${franchisee.name}? This will preserve all records but remove them from active tracking.`))return;
+              await sb.from('franchisees').update({status:'archived',updated_at:new Date().toISOString()}).eq('id',franchisee.id);
+              onClose();
+            }} style={{background:'rgba(138,132,128,.1)',color:'var(--muted)',border:'1px solid var(--border2)',borderRadius:6,padding:'5px 12px',fontFamily:'inherit',fontSize:12,fontWeight:600,cursor:'pointer'}}>
+              Archive Store
+            </button>
+          )}
+          {franchisee.status==='archived'&&(
+            <button className="btn btn-sm" onClick={async()=>{
+              await sb.from('franchisees').update({status:'active',updated_at:new Date().toISOString()}).eq('id',franchisee.id);
+              onClose();
+            }} style={{background:'rgba(95,184,122,.1)',color:'var(--green)',border:'1px solid rgba(95,184,122,.3)',borderRadius:6,padding:'5px 12px',fontFamily:'inherit',fontSize:12,fontWeight:600,cursor:'pointer'}}>
+              Restore Store
+            </button>
+          )}
+          <button className="btn btn-danger btn-sm" onClick={async()=>{
+            if(!window.confirm(`PERMANENTLY DELETE ${franchisee.store_name||franchisee.name}? This removes the franchisee and all related records (tasks, phase dates, login account). This cannot be undone. Consider Archive instead if you may need the records later.`))return;
+            // Clean up related records
+            await sb.from('franchisee_tasks').delete().eq('franchisee_id',franchisee.id);
+            await sb.from('franchisee_phase_dates').delete().eq('franchisee_id',franchisee.id);
+            await sb.from('franchisee_activities').delete().eq('franchisee_id',franchisee.id);
+            // Remove linked Ops login profile (match by store name)
+            if(franchisee.store_name)await sb.from('profiles').delete().eq('store',franchisee.store_name).eq('role','franchisee');
+            await sb.from('franchisees').delete().eq('id',franchisee.id);
+            onClose();
+          }} style={{marginLeft:8}}>Delete</button>
+          <div style={{flex:1}}/>
+          <button className="btn btn-ghost btn-sm" onClick={()=>setEditOpen(true)} style={{marginRight:4}}>✏ Edit Info</button>
+          <button className="btn btn-ghost" onClick={onClose}>Close</button>
+        </div>
+      </div>
+      {editOpen&&<EditFranchiseeModal franchisee={franchisee} onClose={()=>{setEditOpen(false);onClose();}}/>}
+    </div>
+  );
+}
+
+// ── TEAM MANAGER ──────────────────────────────────────────
+function TeamManager(){
+  const [members,setMembers]=useState([]);
+  const [loading,setLoading]=useState(true);
+  const [showInvite,setShowInvite]=useState(false);
+  const [invForm,setInvForm]=useState({email:'',name:'',title:'CMO'});
+  const [busy,setBusy]=useState(false);
+  const [msg,setMsg]=useState('');
+  const [editMember,setEditMember]=useState(null);
+
+  async function load(){setLoading(true);const{data,error}=await sb.from('profiles').select('id,full_name,name,title,role,store,franchisee_id,is_active,created_at').eq('role','hq').order('created_at');if(error)console.error('profiles:',error);setMembers(data||[]);setLoading(false);}
+  useEffect(()=>{load();},[]);
+
+  async function invite(){
+    if(!invForm.email||!invForm.name)return;
+    setBusy(true);setMsg('');
+    const tempPass=Math.random().toString(36).slice(-10)+'A1!';
+    const{data:user,error}=await sb.auth.signUp({email:invForm.email,password:tempPass,options:{data:{name:invForm.name}}});
+    if(user?.user){
+      const{error:upsertErr}=await sb.from('profiles').upsert([{id:user.user.id,full_name:invForm.name,name:invForm.name,title:invForm.title||'Team',role:'hq',is_active:true}],{onConflict:'id'});if(upsertErr)console.error('upsert error:',upsertErr);
+      setMsg(`Account created. Temp password: ${tempPass} — share this securely and ask them to change it on first login.`);
+    }else{setMsg(error?.message||'Error creating account.');}
+    setBusy(false);setInvForm({email:'',name:'',title:'CMO'});load();
+  }
+
+  async function toggleActive(m){await sb.from('profiles').update({is_active:!m.is_active}).eq('id',m.id);load();}
+  const titleColors={CEO:'#CC9C3A',COO:'#5FB87A',CMO:'#D98AA0',CBO:'#8FA8D9',CPO:'#C7A06A'};
+
+  return(
+    <>
+      <div className="page-header">
+        <div><div className="page-title">Accounts</div><div className="page-sub">HQ team account management</div></div>
+        <button className="btn btn-primary" onClick={()=>setShowInvite(s=>!s)}>+ Add HQ Member</button>
+      </div>
+      <div className="content">
+        {showInvite&&(
+          <div className="card" style={{marginBottom:20}}>
+            <div style={{fontWeight:700,marginBottom:12}}>Add Team Member</div>
+            <div className="form-row">
+              <div className="form-group"><label>Full Name</label><input value={invForm.name} onChange={e=>setInvForm(f=>({...f,name:e.target.value}))} placeholder="Deborah Lee"/></div>
+              <div className="form-group"><label>Email</label><input type="email" value={invForm.email} onChange={e=>setInvForm(f=>({...f,email:e.target.value}))} placeholder="deborah@uglydonuts.com"/></div>
+            </div>
+            <div className="form-group" style={{maxWidth:300}}>
+              <label>Title / Role</label>
+              <div style={{display:'flex',gap:8}}>
+                <select value={['CEO','COO','CMO','CBO','CPO','other'].includes(invForm.title)?invForm.title:'other'} onChange={e=>{if(e.target.value!=='other')setInvForm(f=>({...f,title:e.target.value}));else setInvForm(f=>({...f,title:''}));}} style={{background:'var(--panel2)',border:'1px solid var(--border2)',borderRadius:8,padding:'9px 12px',color:'var(--text)',fontFamily:'inherit',fontSize:14,outline:'none',flex:1}}>
+                  <option value="CEO">CEO</option>
+                  <option value="COO">COO</option>
+                  <option value="CMO">CMO</option>
+                  <option value="CBO">CBO</option>
+                  <option value="CPO">CPO</option>
+                  <option value="other">Other (type below)</option>
+                </select>
+              </div>
+              {(!['CEO','COO','CMO','CBO','CPO'].includes(invForm.title))&&(
+                <input value={invForm.title} onChange={e=>setInvForm(f=>({...f,title:e.target.value}))} placeholder="e.g. Director of Ops, Franchise Dev Manager..." style={{marginTop:8,width:'100%',background:'var(--panel2)',border:'1px solid var(--border2)',borderRadius:8,padding:'9px 12px',color:'var(--text)',fontFamily:'inherit',fontSize:14,outline:'none'}}/>
+              )}
+            </div>
+            <div style={{display:'flex',gap:8,alignItems:'center'}}>
+              <button className="btn btn-primary" onClick={invite} disabled={busy||!invForm.email||!invForm.name}>{busy?'Creating...':'Create Account'}</button>
+              <button className="btn btn-ghost" onClick={()=>setShowInvite(false)}>Cancel</button>
+            </div>
+            {msg&&<div style={{marginTop:12,padding:12,background:'rgba(95,184,122,.1)',border:'1px solid rgba(95,184,122,.3)',borderRadius:8,fontSize:13,color:'var(--green)',lineHeight:1.5}}>{msg}</div>}
+          </div>
+        )}
+        {loading?<div className="loading">Loading...</div>:(()=>{
+          const filtered=members;
+          return(
+          <div className="table-wrap">
+            <table>
+              <thead><tr><th>Name</th><th>Title</th><th>Status</th><th>Action</th></tr></thead>
+              <tbody>
+                {filtered.length===0&&<tr><td colSpan={4}><div className="empty"><div className="empty-title">No HQ team members yet</div></div></td></tr>}
+                {filtered.map(m=>(
+                  <tr key={m.id}>
+                    <td data-label="Name" style={{fontWeight:600}}>{m.full_name||m.name||'—'}</td>
+                    <td data-label="Title">{m.title&&<span style={{background:(titleColors[m.title]||'#666')+'22',color:titleColors[m.title]||'#666',padding:'2px 8px',borderRadius:4,fontSize:11,fontWeight:700}}>{m.title}</span>}</td>
+                    <td data-label="Status"><span className={`badge ${m.is_active!==false?'badge-green':'badge-red'}`}>{m.is_active!==false?'Active':'Inactive'}</span></td>
+                    <td data-label="Action" style={{display:'flex',gap:6,alignItems:'center'}}>
+                      <button className="btn btn-ghost btn-sm" onClick={()=>setEditMember(m)}>Edit</button>
+                      <button className="btn btn-ghost btn-sm" onClick={()=>toggleActive(m)}>{m.is_active!==false?'Deactivate':'Reactivate'}</button>
+                      <button className="btn btn-danger btn-sm" onClick={async()=>{
+                        if(!window.confirm(`Permanently delete ${m.full_name||m.name||'this account'}? This cannot be undone.`))return;
+                        // If this is a franchisee account, also remove the linked franchisee record
+                        if(m.role==='franchisee'){
+                          if(m.franchisee_id){
+                            await sb.from('franchisees').delete().eq('id',m.franchisee_id);
+                          }else if(m.store){
+                            await sb.from('franchisees').delete().eq('store_name',m.store);
+                          }
+                        }
+                        await sb.from('profiles').delete().eq('id',m.id);
+                        load();
+                      }}>Delete</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          );
+        })()}
+      </div>
+      {editMember&&<EditMemberModal member={editMember} onClose={()=>{setEditMember(null);load();}}/>}
+    </>
+  );
+}
+
+
+// ── EDIT MEMBER MODAL ─────────────────────────────────────
+function EditMemberModal({member, onClose}){
+  const [form,setForm]=useState({
+    name: member.full_name||member.name||'',
+    title: member.title||'',
+    role: member.role||'hq',
+  });
+  const [newEmail,setNewEmail]=useState('');
+  const [newPass,setNewPass]=useState('');
+  const [busy,setBusy]=useState(false);
+  const [msg,setMsg]=useState('');
+  const [err,setErr]=useState('');
+  const set=(k,v)=>setForm(f=>({...f,[k]:v}));
+
+  async function save(){
+    setBusy(true);setErr('');setMsg('');
+    // Update profile fields
+    const{error}=await sb.from('profiles').update({
+      full_name:form.name, name:form.name,
+      title:form.title, role:form.role,
+    }).eq('id',member.id);
+    if(error){setErr(error.message);setBusy(false);return;}
+    setMsg('Profile updated.');
+    setBusy(false);
+  }
+
+  async function updateEmail(){
+    if(!newEmail){setErr('Enter a new email.');return;}
+    setBusy(true);setErr('');
+    // Note: updating another user's email requires admin API
+    // We store it as a note since Supabase anon key can't change other users' auth
+    setErr('Email changes require Supabase Admin dashboard → Authentication → Users → Edit.');
+    setBusy(false);
+  }
+
+  async function updatePassword(){
+    if(!newPass||newPass.length<8){setErr('Password must be at least 8 characters.');return;}
+    setBusy(true);setErr('');
+    // Can only update own password with anon key
+    // For other users, use Supabase Admin API or ask them to use Change Password
+    setErr('To reset another user\'s password: Supabase dashboard → Authentication → Users → Send password reset email, or ask them to use "Change Password" in the app.');
+    setBusy(false);
+  }
+
+  const titleColors={CEO:'#CC9C3A',COO:'#5FB87A',CMO:'#D98AA0',CBO:'#8FA8D9',CPO:'#C7A06A'};
+
+  return(
+    <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
+      <div className="modal">
+        <div className="modal-header">
+          <div className="modal-title">Edit: {member.full_name||member.name||'Member'}</div>
+          <button className="close-btn" onClick={onClose}>×</button>
+        </div>
+        <div className="modal-body">
+          {/* Profile info */}
+          <div style={{fontWeight:700,fontSize:13,color:'var(--muted)',marginBottom:12,textTransform:'uppercase',letterSpacing:'.06em'}}>Profile</div>
+          <div className="form-group">
+            <label>Full Name</label>
+            <input value={form.name} onChange={e=>set('name',e.target.value)} placeholder="Full name"/>
+          </div>
+          <div className="form-row">
+            <div className="form-group">
+              <label>Title / Role</label>
+              <div style={{display:'flex',gap:8}}>
+                <select value={['CEO','COO','CMO','CBO','CPO'].includes(form.title)?form.title:'other'}
+                  onChange={e=>{if(e.target.value!=='other')set('title',e.target.value);else set('title','');}}
+                  style={{background:'var(--panel2)',border:'1px solid var(--border2)',borderRadius:8,padding:'9px 12px',color:'var(--text)',fontFamily:'inherit',fontSize:13,outline:'none',flex:1}}>
+                  <option value="CEO">CEO</option>
+                  <option value="COO">COO</option>
+                  <option value="CMO">CMO</option>
+                  <option value="CBO">CBO</option>
+                  <option value="CPO">CPO</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+              {!['CEO','COO','CMO','CBO','CPO'].includes(form.title)&&(
+                <input value={form.title} onChange={e=>set('title',e.target.value)} placeholder="Custom title" style={{marginTop:8,width:'100%',background:'var(--panel2)',border:'1px solid var(--border2)',borderRadius:8,padding:'9px 12px',color:'var(--text)',fontFamily:'inherit',fontSize:13,outline:'none'}}/>
+              )}
+            </div>
+            <div className="form-group">
+              <label>Access Level</label>
+              <select value={form.role} onChange={e=>set('role',e.target.value)} style={{background:'var(--panel2)',border:'1px solid var(--border2)',borderRadius:8,padding:'9px 12px',color:'var(--text)',fontFamily:'inherit',fontSize:13,outline:'none',width:'100%'}}>
+                <option value="hq">HQ</option>
+                <option value="franchisee">Franchisee</option>
+              </select>
+            </div>
+          </div>
+          {msg&&<div style={{color:'var(--green)',fontSize:13,marginBottom:8}}>{msg}</div>}
+          {err&&<div style={{color:'var(--red)',fontSize:13,marginBottom:8}}>{err}</div>}
+          <button className="btn btn-primary btn-sm" onClick={save} disabled={busy}>{busy?'Saving...':'Save Profile'}</button>
+
+          <div style={{height:1,background:'var(--border)',margin:'20px 0'}}/>
+
+          {/* Password reset */}
+          <div style={{fontWeight:700,fontSize:13,color:'var(--muted)',marginBottom:12,textTransform:'uppercase',letterSpacing:'.06em'}}>Password Reset</div>
+          <div style={{background:'rgba(204,156,58,.08)',border:'1px solid rgba(204,156,58,.2)',borderRadius:8,padding:12,fontSize:13,color:'var(--muted)',lineHeight:1.6}}>
+            To reset this user's password, go to:<br/>
+            <strong style={{color:'var(--text)'}}>Supabase Dashboard → Authentication → Users → find user → Send password reset email</strong><br/><br/>
+            Or ask them to log in and use <strong style={{color:'var(--gold)'}}>Change Password</strong> in the app sidebar.
+          </div>
+        </div>
+        <div className="modal-footer">
+          <button className="btn btn-ghost" onClick={onClose}>Close</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+// ── EDIT FRANCHISEE MODAL ─────────────────────────────────
+function EditFranchiseeModal({franchisee, onClose}){
+  const [form,setForm]=useState({
+    name:franchisee.name||'',
+    store_name:franchisee.store_name||'',
+    email:franchisee.email||'',
+    phone:franchisee.phone||'',
+    territory:franchisee.territory||'',
+    entity_name:franchisee.entity_name||'',
+  });
+  const [busy,setBusy]=useState(false);
+  const [msg,setMsg]=useState('');
+  const set=(k,v)=>setForm(f=>({...f,[k]:v}));
+
+  async function save(){
+    setBusy(true);
+    const{error}=await sb.from('franchisees').update({
+      name:form.name,
+      store_name:form.store_name,
+      email:form.email,
+      phone:form.phone,
+      territory:form.territory,
+      entity_name:form.entity_name,
+      updated_at:new Date().toISOString(),
+    }).eq('id',franchisee.id);
+    if(error){setMsg('Error: '+error.message);setBusy(false);return;}
+    setMsg('Saved!');
+    setTimeout(()=>onClose(),600);
+    setBusy(false);
+  }
+
+  return(
+    <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
+      <div className="modal">
+        <div className="modal-header">
+          <div className="modal-title">Edit Store Info</div>
+          <button className="close-btn" onClick={onClose}>×</button>
+        </div>
+        <div className="modal-body">
+          <div style={{fontSize:11,fontWeight:700,color:'var(--muted)',textTransform:'uppercase',letterSpacing:'.06em',marginBottom:10}}>Store</div>
+          <div className="form-row">
+            <div className="form-group"><label>Store Name</label><input value={form.store_name} onChange={e=>set('store_name',e.target.value)} placeholder="e.g. Ugly Donuts Dallas"/></div>
+            <div className="form-group"><label>Territory</label><input value={form.territory} onChange={e=>set('territory',e.target.value)} placeholder="e.g. Dallas TX"/></div>
+          </div>
+          <div className="form-group"><label>Legal Entity Name</label><input value={form.entity_name} onChange={e=>set('entity_name',e.target.value)}/></div>
+
+          <div style={{height:1,background:'var(--border)',margin:'16px 0'}}/>
+          <div style={{fontSize:11,fontWeight:700,color:'var(--muted)',textTransform:'uppercase',letterSpacing:'.06em',marginBottom:10}}>Franchisee Contact</div>
+          <div className="form-group"><label>Full Name</label><input value={form.name} onChange={e=>set('name',e.target.value)} placeholder="Franchisee full name"/></div>
+          <div className="form-row">
+            <div className="form-group"><label>Email</label><input type="email" value={form.email} onChange={e=>set('email',e.target.value)} placeholder="franchisee@email.com"/></div>
+            <div className="form-group"><label>Phone</label><input value={form.phone} onChange={e=>set('phone',e.target.value)} placeholder="+1 (555) 000-0000"/></div>
+          </div>
+          {msg&&<div style={{fontSize:13,color:msg==='Saved!'?'var(--green)':'var(--red)',marginTop:4}}>{msg}</div>}
+        </div>
+        <div className="modal-footer">
+          <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
+          <button className="btn btn-primary" onClick={save} disabled={busy}>{busy?'Saving...':'Save Changes'}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+// ── PHASE BOARD ───────────────────────────────────────────
+
+// ── PHASE BOARD ───────────────────────────────────────────
+function PhaseBoard(){
+  const [boardTab,setBoardTab]=useState('leads'); // 'leads' | 'franchisees'
+
+  return(
+    <>
+      <div className="page-header">
+        <div><div className="page-title">Phase Board</div><div className="page-sub">Kanban view by stage</div></div>
+        <div style={{display:'flex',gap:8}}>
+          <button className={`btn btn-sm ${boardTab==='leads'?'btn-primary':'btn-ghost'}`} onClick={()=>setBoardTab('leads')}>◉ Lead Pipeline</button>
+          <button className={`btn btn-sm ${boardTab==='franchisees'?'btn-primary':'btn-ghost'}`} onClick={()=>setBoardTab('franchisees')}>◍ Franchisee Phases</button>
+        </div>
+      </div>
+      {boardTab==='leads'?<LeadBoard/>:<FranchiseeBoard/>}
+    </>
+  );
+}
+
+// ── LEAD BOARD (Stage Kanban) ─────────────────────────────
+function LeadBoard(){
+  const [leads,setLeads]=useState([]);
+  const [loading,setLoading]=useState(true);
+  const [selectedLead,setSelectedLead]=useState(null);
+  const [filterGrade,setFilterGrade]=useState('all');
+  const [boardSearch,setBoardSearch]=useState('');
+
+  async function load(){
+    setLoading(true);
+    const{data}=await sb.from('leads').select('*').neq('stage','rejected').or('converted_to_franchisee.is.null,converted_to_franchisee.eq.false').order('created_at',{ascending:false});
+    setLeads(data||[]);setLoading(false);
+  }
+  useEffect(()=>{load();},[]);
+
+  const BOARD_STAGES=STAGES.filter(s=>s.key!=='rejected'&&s.key!=='agreement_signed');
+
+  const byStage=useMemo(()=>{
+    const g={};
+    BOARD_STAGES.forEach(s=>{g[s.key]=[];});
+    const q=(boardSearch||'').toLowerCase();
+    leads.forEach(l=>{
+      const matchGrade=filterGrade==='all'||l.grade===filterGrade;
+      const matchSearch=!q||l.name?.toLowerCase().includes(q)||l.email?.toLowerCase().includes(q)||parseTerritories(l.territories).map(t=>t.name||t).join(' ').toLowerCase().includes(q);
+      if(matchGrade&&matchSearch&&g[l.stage])g[l.stage].push(l);
+    });
+    // Waiting for Sign: show closest-to-14-days first (oldest fdd_sent_at on top).
+    // Leads with no FDD date sink to the bottom.
+    if(g['waiting_for_sign']){
+      g['waiting_for_sign'].sort((a,b)=>{
+        if(!a.fdd_sent_at&&!b.fdd_sent_at)return 0;
+        if(!a.fdd_sent_at)return 1;
+        if(!b.fdd_sent_at)return -1;
+        return new Date(a.fdd_sent_at)-new Date(b.fdd_sent_at);
+      });
+    }
+    return g;
+  },[leads,filterGrade,boardSearch]);
+
+  return(
+    <div className="content" style={{paddingTop:16}}>
+      <div style={{display:'flex',gap:10,alignItems:'center',marginBottom:16,flexWrap:'wrap'}}>
+        <input placeholder="Search leads..." value={boardSearch||''} onChange={e=>setBoardSearch(e.target.value)} style={{background:'var(--panel)',border:'1px solid var(--border2)',borderRadius:8,padding:'8px 12px',color:'var(--text)',fontSize:13,fontFamily:'inherit',outline:'none',minWidth:200}}/>
+        <span style={{fontSize:12,color:'var(--muted)'}}>Grade:</span>
+        {['all','high','mid','low'].map(g=>(
+          <button key={g} className={`btn btn-sm ${filterGrade===g?'btn-primary':'btn-ghost'}`} onClick={()=>setFilterGrade(g)}>
+            {g.charAt(0).toUpperCase()+g.slice(1)}
+          </button>
+        ))}
+        <span style={{marginLeft:'auto',fontSize:12,color:'var(--muted)'}}>{leads.length} active leads</span>
+      </div>
+      {loading?<div className="loading">Loading...</div>:(
+        <div style={{display:'flex',gap:12,overflowX:'auto',paddingBottom:16,alignItems:'flex-start'}}>
+          {BOARD_STAGES.map(stage=>{
+            const cards=byStage[stage.key]||[];
+            return(
+              <div key={stage.key} style={{minWidth:200,maxWidth:200,flexShrink:0}}>
+                <div style={{background:'var(--panel2)',borderRadius:'10px 10px 0 0',padding:'10px 12px',border:'1px solid var(--border)',borderBottom:`3px solid ${stage.color}`}}>
+                  <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:2}}>
+                    <div style={{width:8,height:8,borderRadius:'50%',background:stage.color}}/>
+                    <span style={{fontSize:12,fontWeight:700,color:stage.color}}>{stage.label}</span>
+                  </div>
+                  <div style={{fontSize:11,color:'var(--muted)'}}>{cards.length} lead{cards.length!==1?'s':''}</div>
+                </div>
+                <div style={{display:'flex',flexDirection:'column',gap:8,padding:'8px 0'}}>
+                  {cards.length===0&&(
+                    <div style={{padding:'16px 12px',textAlign:'center',color:'var(--muted2)',fontSize:12,border:'1px dashed var(--border)',borderRadius:8}}>Empty</div>
+                  )}
+                  {cards.map(l=>{
+                    const terrs=parseTerritories(l.territories);
+                    // Waiting for Sign: 14-day signature window coloring
+                    const isWaiting=stage.key==='waiting_for_sign';
+                    let signColor=null,signDays=null,signPassed=false;
+                    if(isWaiting&&l.fdd_sent_at){
+                      const deadline=new Date(new Date(l.fdd_sent_at).getTime()+14*86400000);
+                      signDays=daysUntil(deadline.toISOString().split('T')[0]);
+                      signPassed=signDays<=0; // 14 days elapsed
+                      signColor=signPassed?'#2E7D4F':'#B5861F'; // green if passed, amber if waiting
+                    }
+                    const cardBg=signColor?signColor+'18':'var(--panel)';
+                    const cardBorder=signColor?signColor:'var(--border)';
+                    return(
+                      <div key={l.id}
+                        style={{background:cardBg,border:`1px solid ${cardBorder}`,borderRadius:10,padding:'11px 12px',cursor:'pointer',transition:'all .15s',boxShadow:'var(--shadow)'}}
+                        onClick={()=>setSelectedLead(l)}
+                        onMouseEnter={e=>{e.currentTarget.style.borderColor=stage.color;e.currentTarget.style.boxShadow='0 3px 10px rgba(30,25,15,.10)';}}
+                        onMouseLeave={e=>{e.currentTarget.style.borderColor=cardBorder;e.currentTarget.style.boxShadow='var(--shadow)';}}>
+                        <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:4}}>
+                          <span className={`badge badge-${l.grade}`}>{l.grade}</span>
+                          <span style={{fontSize:13,fontWeight:800,flex:1,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{l.name}</span>
+                          {l.updated_at&&(()=>{const dd=Math.floor((Date.now()-new Date(l.updated_at))/86400000);return dd>=3?<span title={`No activity for ${dd} days`} style={{fontSize:10,fontWeight:800,color:dd>=7?'var(--red)':'var(--muted2)',flexShrink:0}}>{dd}d</span>:null;})()}
+                        </div>
+                        {isWaiting&&signDays!==null&&(
+                          <div style={{fontSize:10,fontWeight:700,color:signColor,marginBottom:4}}>
+                            {signPassed?`✓ 14-day window passed (${Math.abs(signDays)}d ago)`:`⏳ ${signDays}d left in window`}
+                          </div>
+                        )}
+                        {isWaiting&&signDays===null&&(
+                          <div style={{fontSize:10,color:'var(--muted2)',marginBottom:4}}>No FDD date set</div>
+                        )}
+                        {terrs.length>0&&(
+                          <div style={{fontSize:11,color:'var(--muted)',marginBottom:4}}>
+                            {terrs.map((t,i)=>(
+                              <span key={i} style={{display:'inline-block',background:t.priority==='primary'?'rgba(204,156,58,.15)':'#EFE9DB',color:t.priority==='primary'?'var(--gold)':'var(--muted)',borderRadius:3,padding:'1px 5px',fontSize:10,marginRight:3}}>{t.name||t}</span>
+                            ))}
+                          </div>
+                        )}
+                        {l.assigned_to&&<div style={{fontSize:10,color:'var(--muted2)'}}>{l.assigned_to}</div>}
+                        {l.email&&<div style={{fontSize:10,color:'var(--muted2)',marginTop:2,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{l.email}</div>}
+                        <div style={{display:'flex',gap:8,marginTop:6}}>
+                          {l.email&&<a href={`mailto:${l.email}`} onClick={e=>e.stopPropagation()} style={{fontSize:10,color:'var(--blue)',textDecoration:'none'}}>✉ Email</a>}
+                          {l.phone&&<a href={`tel:${l.phone}`} onClick={e=>e.stopPropagation()} style={{fontSize:10,color:'var(--green)',textDecoration:'none'}}>📞 Call</a>}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+      {selectedLead&&<LeadModal lead={selectedLead} allLeads={leads} onClose={()=>{setSelectedLead(null);load();}}/>}
+    </div>
+  );
+}
+
+// ── FRANCHISEE BOARD (Phase Kanban) ──────────────────────
+function FranchiseeBoard(){
+  const [phases,setPhases]=useState([]);
+  const [franchisees,setFranchisees]=useState([]);
+  const [phaseDates,setPhaseDates]=useState([]);
+  const [allTasks,setAllTasks]=useState([]);
+  const [loading,setLoading]=useState(true);
+  const [selectedFr,setSelectedFr]=useState(null);
+  const [filterOwner,setFilterOwner]=useState('all');
+
+  async function load(){
+    setLoading(true);
+    const[phRes,frRes,pdRes,ptRes]=await Promise.all([
+      sb.from('phases').select('*').order('sort_order'),
+      sb.from('franchisees').select('*').order('created_at'),
+      sb.from('franchisee_phase_dates').select('*'),
+      sb.from('phase_tasks').select('*').order('sort_order'),
+    ]);
+    setPhases(phRes.data||[]);setFranchisees(frRes.data||[]);
+    setPhaseDates(pdRes.data||[]);setAllTasks(ptRes.data||[]);setLoading(false);
+  }
+  useEffect(()=>{load();},[]);
+
+  const byPhase=useMemo(()=>{
+    const g={};phases.forEach(p=>{g[p.id]=[];});g['open']=[];
+    franchisees.forEach(f=>{
+      if(f.status==='archived')return; // archived: hide from board entirely
+      // soft_open = still in pipeline (Soft Opening → Grand Opening): show in current phase column.
+      // open = fully opened (finished last phase): show in Open column.
+      if(f.status==='open')g['open'].push(f);
+      else if(f.current_phase_id&&g[f.current_phase_id])g[f.current_phase_id].push(f);
+      else if(f.status==='soft_open')g['open'].push(f); // fallback if no phase
+    });
+    return g;
+  },[phases,franchisees]);
+
+  const ownerPhases=useMemo(()=>{
+    if(filterOwner==='all')return new Set(phases.map(p=>p.id));
+    return new Set(allTasks.filter(t=>t.owner===filterOwner).map(t=>t.phase_id));
+  },[filterOwner,allTasks,phases]);
+
+  const ownerColors={CEO:'#CC9C3A',COO:'#5FB87A',CMO:'#D98AA0',CBO:'#8FA8D9',CPO:'#C7A06A'};
+
+  return(
+    <div className="content" style={{paddingTop:16}}>
+      <div style={{display:'flex',gap:8,alignItems:'center',marginBottom:16,flexWrap:'wrap'}}>
+        <span style={{fontSize:12,color:'var(--muted)'}}>Owner:</span>
+        {['all','CEO','COO','CMO','CBO','CPO'].map(o=>(
+          <button key={o} className={`btn btn-sm ${filterOwner===o?'btn-primary':'btn-ghost'}`}
+            onClick={()=>setFilterOwner(o)}
+            style={filterOwner===o?{}:{color:ownerColors[o]||'var(--muted)'}}>
+            {o}
+          </button>
+        ))}
+        <span style={{marginLeft:'auto',fontSize:12,color:'var(--muted)'}}>{franchisees.length} total</span>
+      </div>
+      {loading?<div className="loading">Loading...</div>:(
+        <div style={{display:'flex',gap:12,overflowX:'auto',paddingBottom:16,alignItems:'flex-start'}}>
+          {phases.map((phase,phIdx)=>{
+            const cards=byPhase[phase.id]||[];
+            const isOwnerPhase=ownerPhases.has(phase.id);
+            const phaseTasks=allTasks.filter(t=>t.phase_id===phase.id&&(filterOwner==='all'||t.owner===filterOwner));
+            if(filterOwner!=='all'&&!isOwnerPhase)return null;
+            return(
+              <div key={phase.id} style={{minWidth:220,maxWidth:220,flexShrink:0}}>
+                <div style={{background:'var(--panel2)',borderRadius:'10px 10px 0 0',padding:'10px 12px',border:'1px solid var(--border)',borderBottom:`3px solid ${phase.color}`}}>
+                  <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:2}}>
+                    <div style={{width:8,height:8,borderRadius:'50%',background:phase.color}}/>
+                    <span style={{fontSize:12,fontWeight:700,color:phase.color}}>Phase {phIdx+1}: {phase.name}</span>
+                  </div>
+                  <div style={{fontSize:11,color:'var(--muted)',marginBottom:filterOwner!=='all'&&phaseTasks.length>0?6:0}}>{cards.length} franchisee{cards.length!==1?'s':''}</div>
+                  {filterOwner!=='all'&&phaseTasks.length>0&&(
+                    <div style={{borderTop:'1px solid var(--border)',paddingTop:6}}>
+                      {phaseTasks.map(t=>(
+                        <div key={t.id} style={{fontSize:10,color:'var(--muted2)',padding:'1px 0'}}>· {t.title}</div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <div style={{display:'flex',flexDirection:'column',gap:8,padding:'8px 0'}}>
+                  {cards.length===0&&(
+                    <div style={{padding:'16px 12px',textAlign:'center',color:'var(--muted2)',fontSize:12,border:'1px dashed var(--border)',borderRadius:8}}>Empty</div>
+                  )}
+                  {cards.map(f=>{
+                    const pd=phaseDates.find(d=>d.franchisee_id===f.id&&d.phase_id===f.current_phase_id);
+                    const days=pd?.due_date?daysUntil(pd.due_date):null;
+                    return(
+                      <div key={f.id}
+                        style={{background:'var(--panel)',border:'1px solid var(--border)',borderRadius:8,padding:'10px 12px',cursor:'pointer',transition:'border-color .15s'}}
+                        onClick={()=>setSelectedFr(f)}
+                        onMouseEnter={e=>e.currentTarget.style.borderColor=phase.color}
+                        onMouseLeave={e=>e.currentTarget.style.borderColor='var(--border)'}>
+                        <div style={{fontSize:13,fontWeight:700,marginBottom:2}}>{f.store_name||f.name}</div>
+                        <div style={{fontSize:11,color:'var(--muted)',marginBottom:2}}>{f.name}</div>
+                        <div style={{fontSize:10,color:'var(--muted2)',marginBottom:4}}>{f.territory}</div>
+                        {(f.email||f.phone)&&(
+                          <div style={{display:'flex',gap:8,marginBottom:6}}>
+                            {f.email&&<a href={`mailto:${f.email}`} onClick={e=>e.stopPropagation()} style={{fontSize:10,color:'var(--blue)',textDecoration:'none'}}>✉ Email</a>}
+                            {f.phone&&<a href={`tel:${f.phone}`} onClick={e=>e.stopPropagation()} style={{fontSize:10,color:'var(--green)',textDecoration:'none'}}>📞 Call</a>}
+                          </div>
+                        )}
+                        {days!==null&&(
+                          <div style={{fontSize:10,fontWeight:600,color:days<0?'var(--red)':days<=7?'var(--orange)':'var(--muted)'}}>
+                            {days<0?`${Math.abs(days)}d overdue`:days===0?'Due today':days===1?'Due tomorrow':`Due in ${days}d`}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+          {/* Open stores: shown as summary only, not a full column */}
+          {filterOwner==='all'&&(byPhase['open']||[]).length>0&&(
+            <div style={{minWidth:180,maxWidth:180,flexShrink:0,opacity:.6}}>
+              <div style={{background:'rgba(95,184,122,.06)',borderRadius:'10px 10px 0 0',padding:'10px 12px',border:'1px solid rgba(95,184,122,.2)',borderBottom:'3px solid var(--green)'}}>
+                <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:2}}>
+                  <div style={{width:8,height:8,borderRadius:'50%',background:'var(--green)'}}/>
+                  <span style={{fontSize:12,fontWeight:700,color:'var(--green)'}}>Open & Operating</span>
+                </div>
+                <div style={{fontSize:22,fontWeight:700,color:'var(--green)',marginTop:4}}>{(byPhase['open']||[]).length}</div>
+                <div style={{fontSize:10,color:'var(--muted)',marginTop:2}}>store{(byPhase['open']||[]).length!==1?'s':''} · managed in Franchise Ops</div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+      {selectedFr&&<FranchiseeModal franchisee={selectedFr} phases={phases} allTasks={allTasks} onClose={()=>{setSelectedFr(null);load();}}/>}
+    </div>
+  );
+}
+
+// ── PHASE SETTINGS ────────────────────────────────────────
+function PhaseSettings(){
+  const [phases,setPhases]=useState([]);
+  const [tasks,setTasks]=useState([]);
+  const [expanded,setExpanded]=useState(null);
+  const [loading,setLoading]=useState(true);
+  const [showAdd,setShowAdd]=useState(false);
+  const [newPhase,setNewPhase]=useState({name:'',description:'',color:'#CC9C3A'});
+
+  async function load(){setLoading(true);const[ph,pt]=await Promise.all([sb.from('phases').select('*').order('sort_order'),sb.from('phase_tasks').select('*').order('sort_order')]);setPhases(ph.data||[]);setTasks(pt.data||[]);setLoading(false);}
+  useEffect(()=>{load();},[]);
+
+  async function updatePhase(id,field,value){await sb.from('phases').update({[field]:value}).eq('id',id);setPhases(ps=>ps.map(p=>p.id===id?{...p,[field]:value}:p));}
+  async function deletePhase(id){if(!window.confirm('Delete phase and all tasks?'))return;await sb.from('phases').delete().eq('id',id);load();}
+  async function addPhase(){if(!newPhase.name)return;const maxO=Math.max(0,...phases.map(p=>p.sort_order));await sb.from('phases').insert([{...newPhase,sort_order:maxO+1}]);setNewPhase({name:'',description:'',color:'#CC9C3A'});setShowAdd(false);load();}
+  async function updateTask(id,field,value){await sb.from('phase_tasks').update({[field]:value}).eq('id',id);setTasks(ts=>ts.map(t=>t.id===id?{...t,[field]:value}:t));}
+  async function deleteTask(id){if(!window.confirm('Delete task?'))return;await sb.from('phase_tasks').delete().eq('id',id);setTasks(ts=>ts.filter(t=>t.id!==id));}
+  async function addTask(phaseId){const pt=tasks.filter(t=>t.phase_id===phaseId);const maxO=Math.max(0,...pt.map(t=>t.sort_order));const{data}=await sb.from('phase_tasks').insert([{phase_id:phaseId,title:'New task',owner:'COO',sort_order:maxO+1}]).select().single();if(data)setTasks(ts=>[...ts,data]);}
+
+  if(loading)return<div className="loading">Loading...</div>;
+  return(
+    <>
+      <div className="page-header">
+        <div><div className="page-title">Phase Settings</div><div className="page-sub">Configure phases and checklist tasks</div></div>
+        <button className="btn btn-primary" onClick={()=>setShowAdd(s=>!s)}>+ Add Phase</button>
+      </div>
+      <div className="content">
+        {showAdd&&(
+          <div className="card" style={{marginBottom:20}}>
+            <div style={{fontWeight:700,marginBottom:12}}>New Phase</div>
+            <div className="form-row">
+              <div className="form-group"><label>Phase Name</label><input value={newPhase.name} onChange={e=>setNewPhase(p=>({...p,name:e.target.value}))} placeholder="e.g. Lease Negotiation"/></div>
+              <div className="form-group"><label>Color</label><input type="color" value={newPhase.color} onChange={e=>setNewPhase(p=>({...p,color:e.target.value}))} style={{height:40,cursor:'pointer'}}/></div>
+            </div>
+            <div className="form-group"><label>Description</label><input value={newPhase.description} onChange={e=>setNewPhase(p=>({...p,description:e.target.value}))}/></div>
+            <div style={{display:'flex',gap:8}}><button className="btn btn-primary btn-sm" onClick={addPhase}>Save Phase</button><button className="btn btn-ghost btn-sm" onClick={()=>setShowAdd(false)}>Cancel</button></div>
+          </div>
+        )}
+        {phases.map((phase,idx)=>{
+          const phaseTasks=tasks.filter(t=>t.phase_id===phase.id);
+          const isOpen=expanded===phase.id;
+          return(
+            <div key={phase.id} className="settings-phase">
+              <div className="settings-phase-header" onClick={()=>setExpanded(isOpen?null:phase.id)}>
+                <div className="sp-title" style={{display:'flex',alignItems:'center',gap:8,flex:1,minWidth:0}}>
+                  <div style={{width:10,height:10,borderRadius:'50%',background:phase.color,flexShrink:0}}/>
+                  <span style={{fontSize:13,fontWeight:700,flexShrink:0}}>{idx+1}.</span>
+                  <input className="inline-input" value={phase.name} onClick={e=>e.stopPropagation()} onChange={e=>updatePhase(phase.id,'name',e.target.value)} style={{fontWeight:700,fontSize:13,flex:1,minWidth:0}}/>
+                </div>
+                <div className="sp-meta" style={{display:'flex',alignItems:'center',gap:8,flexShrink:0}}>
+                  <span style={{fontSize:12,color:'var(--muted)'}}>{phaseTasks.length} tasks</span>
+                  <input type="color" value={phase.color} onClick={e=>e.stopPropagation()} onChange={e=>updatePhase(phase.id,'color',e.target.value)} style={{width:24,height:24,border:'none',borderRadius:4,cursor:'pointer',background:'none',padding:0}}/>
+                  <button className="btn btn-danger btn-sm" onClick={e=>{e.stopPropagation();deletePhase(phase.id);}}>Delete</button>
+                  <span style={{color:'var(--muted)'}}>{isOpen?'▲':'▼'}</span>
+                </div>
+              </div>
+              {isOpen&&(
+                <div className="settings-phase-tasks">
+                  {phaseTasks.map(task=>(
+                    <div key={task.id} className="settings-task-row">
+                      <span className={`owner-badge owner-${task.owner}`}>{task.owner}</span>
+                      <input className="inline-input" value={task.title} onChange={e=>updateTask(task.id,'title',e.target.value)} style={{flex:1}}/>
+                      <select value={task.owner} onChange={e=>updateTask(task.id,'owner',e.target.value)} style={{background:'var(--panel)',border:'1px solid var(--border2)',borderRadius:6,padding:'4px 8px',color:'var(--text)',fontFamily:'inherit',fontSize:12,outline:'none',cursor:'pointer'}}>
+                        {OWNERS.map(o=><option key={o}>{o}</option>)}
+                      </select>
+                      <button className="btn btn-danger btn-sm" onClick={()=>deleteTask(task.id)}>✕</button>
+                    </div>
+                  ))}
+                  <button className="btn btn-ghost btn-sm" style={{marginTop:12}} onClick={()=>addTask(phase.id)}>+ Add Task</button>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </>
+  );
+}
+
+
+// ── CHANGE PASSWORD ───────────────────────────────────────
+function ChangePassword({onDone}){
+  const [newPass,setNewPass]=useState('');
+  const [confirm,setConfirm]=useState('');
+  const [busy,setBusy]=useState(false);
+  const [msg,setMsg]=useState('');
+  const [err,setErr]=useState('');
+
+  async function save(e){
+    e.preventDefault();
+    if(newPass.length<8){setErr('Password must be at least 8 characters.');return;}
+    if(newPass!==confirm){setErr('Passwords do not match.');return;}
+    setBusy(true);setErr('');setMsg('');
+    const{error}=await sb.auth.updateUser({password:newPass});
+    if(error){setErr(error.message);}
+    else{setMsg('Password changed successfully.');setNewPass('');setConfirm('');}
+    setBusy(false);
+  }
+
+  return(
+    <>
+      <div className="page-header">
+        <div><div className="page-title">Change Password</div><div className="page-sub">Update your account password</div></div>
+      </div>
+      <div className="content">
+        <div className="card" style={{maxWidth:400}}>
+          <form onSubmit={save}>
+            <div className="form-group">
+              <label>New Password</label>
+              <input type="password" value={newPass} onChange={e=>setNewPass(e.target.value)} placeholder="Min. 8 characters" autoFocus/>
+            </div>
+            <div className="form-group">
+              <label>Confirm Password</label>
+              <input type="password" value={confirm} onChange={e=>setConfirm(e.target.value)} placeholder="Repeat new password"/>
+            </div>
+            {err&&<div style={{color:'var(--red)',fontSize:13,marginBottom:12}}>{err}</div>}
+            {msg&&<div style={{color:'var(--green)',fontSize:13,marginBottom:12}}>{msg} <button type="button" onClick={onDone} style={{background:'none',border:'none',color:'var(--gold)',cursor:'pointer',fontSize:13,padding:0,fontFamily:'inherit'}}>Go back →</button></div>}
+            <div style={{display:'flex',gap:10}}>
+              <button type="submit" className="btn btn-primary" disabled={busy||!newPass||!confirm}>{busy?'Saving...':'Save Password'}</button>
+              <button type="button" className="btn btn-ghost" onClick={onDone}>Cancel</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+<script>
+/* Pull-to-refresh for installed PWA (mobile touch only). Keeps current screen via #open= hash. */
+(function(){var sy=0,pull=0,active=false,el=null;
+function ind(){el=document.createElement('div');el.id='ptr-ind';el.style.cssText='position:fixed;top:-46px;left:50%;transform:translateX(-50%);z-index:9998;background:#14201E;color:#F0D68A;font:700 12px Inter,sans-serif;padding:9px 16px;border-radius:999px;transition:top .12s;box-shadow:0 4px 14px rgba(0,0,0,.25);pointer-events:none;';el.textContent='\u2193 Pull to refresh';document.body.appendChild(el);}
+document.addEventListener('touchstart',function(e){if((window.scrollY||0)<=0&&!document.querySelector('.modal-overlay,.more-sheet-backdrop')){sy=e.touches[0].clientY;active=true;pull=0;}},{passive:true});
+document.addEventListener('touchmove',function(e){if(!active)return;pull=e.touches[0].clientY-sy;if(pull>18){if(!el)ind();var p=Math.min(pull,120);el.style.top=(p*0.45-38)+'px';el.textContent=p>=100?'\u21bb Release to refresh':'\u2193 Pull to refresh';}},{passive:true});
+document.addEventListener('touchend',function(){if(active&&pull>=100){if(el){el.textContent='Refreshing\u2026';el.style.top='10px';}setTimeout(function(){location.reload();},120);}else if(el){el.style.top='-46px';}active=false;pull=0;},{passive:true});
+})();
+</script>
+</body>
+</html>

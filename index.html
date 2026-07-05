@@ -29,29 +29,45 @@ window.addEventListener('appinstalled', function(){ window._pwaPrompt = null; wi
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@700&display=swap');
 :root{
-  --gold:#CC9C3A;--gold-dim:#7A5C1E;--black:#0A1413;--panel:#13201F;--panel2:#1A2A28;
-  --border:#243634;--border2:#2F423F;--text:#F0EDE8;--muted:#869490;--muted2:#566460;
-  --red:#E05252;--green:#5FB87A;--blue:#5B8FD4;--orange:#14B8A6;--purple:#9B78D4;
-  --teal:#14B8A6;--teal-bright:#2DD4BF;
-  --cat-operations:#5B8FD4;--cat-marketing:#D98AA0;--cat-qa:#E05252;
-  --cat-training:#CC9C3A;--cat-seasonal:#9B78D4;
+  /* Hybrid: light workspace tokens (sidebar/auth re-scope to dark below) */
+  --gold:#B8860B;--gold-dim:#8A6614;--black:#F5F1E8;--panel:#FFFFFF;--panel2:#FAF7F0;
+  --border:#E9E2D2;--border2:#D9D0BA;--text:#202623;--muted:#635D4E;--muted2:#8B8470;
+  --red:#BE4A3E;--green:#2E7D4F;--blue:#2C5F9E;--orange:#0E8074;--purple:#6B4FA3;
+  --teal:#0E8074;--teal-bright:#0B6B60;
+  --cat-operations:#2C5F9E;--cat-marketing:#B05A75;--cat-qa:#BE4A3E;
+  --cat-training:#8A6614;--cat-seasonal:#6B4FA3;
+  --ink:#14201E;--ink-gold:#F0D68A;--shadow:0 1px 3px rgba(30,25,15,.06);
 }
+/* auth: gold CTA on dark */
+.auth-wrap .btn-gold{background:var(--gold);color:#0A1413;}
+/* Dark chrome scopes: sidebar + login keep the brand green-black */
+.sidebar,.auth-wrap{
+  --gold:#E3BE64;--gold-dim:#7A5C1E;--panel:#13201F;--panel2:#1A2A28;
+  --border:#243634;--border2:#2F423F;--text:#F0EDE8;--muted:#93A19A;--muted2:#5E6B66;
+  --red:#E05252;--green:#5FB87A;--teal:#14B8A6;--teal-bright:#2DD4BF;
+background:linear-gradient(180deg,#0C1A19,#0A1514);}
 *{box-sizing:border-box;margin:0;padding:0;}
-body{font-family:'Inter',sans-serif;background:var(--black);color:var(--text);min-height:100vh;font-size:14px;}
+.tabbar{display:none;}
+.more-sheet-backdrop{position:fixed;inset:0;background:rgba(15,25,20,.45);z-index:55;}
+.more-sheet{position:fixed;left:10px;right:10px;bottom:calc(64px + env(safe-area-inset-bottom));background:#fff;border:1px solid var(--border);border-radius:16px;box-shadow:0 12px 40px rgba(20,15,5,.25);padding:8px;z-index:56;display:grid;grid-template-columns:1fr 1fr;gap:4px;}
+.more-item{display:flex;align-items:center;gap:10px;border:none;background:none;font-family:inherit;font-size:13px;font-weight:700;color:var(--text);padding:13px 12px;border-radius:10px;cursor:pointer;text-align:left;}
+.more-item:hover{background:var(--panel2);}
+.more-item svg{color:var(--gold-dim);flex:none;}
+body{font-family:'Inter',sans-serif;background:#F5F1E8;color:var(--text);min-height:100vh;font-size:14px;}
 /* AUTH */
-.auth-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;}
+.auth-wrap{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px 16px;}
 .auth-card{width:380px;background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:40px;}
 .auth-logo{font-family:'Playfair Display',serif;font-size:22px;color:var(--gold);margin-bottom:2px;}
 .auth-app{font-size:12px;color:var(--teal-bright);font-weight:700;letter-spacing:.1em;text-transform:uppercase;margin-bottom:28px;}
 .auth-card label{display:block;color:var(--muted);font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;margin-bottom:6px;}
 .auth-card input{width:100%;background:var(--panel2);border:1px solid var(--border2);border-radius:8px;padding:10px 14px;color:var(--text);font-size:14px;font-family:inherit;outline:none;margin-bottom:14px;transition:border-color .2s;}
 .auth-card input:focus{border-color:var(--teal);}
-.btn-gold{width:100%;background:var(--teal);color:#04201C;border:none;border-radius:8px;padding:12px;font-size:14px;font-weight:700;font-family:inherit;cursor:pointer;}
+.btn-gold{width:100%;background:var(--ink);color:var(--ink-gold);border:none;border-radius:8px;padding:12px;font-size:14px;font-weight:700;font-family:inherit;cursor:pointer;}
 .btn-gold:hover{opacity:.88;}
 .auth-err{color:var(--red);font-size:12px;margin-top:10px;text-align:center;}
 /* LAYOUT */
 .app{display:flex;min-height:100vh;}
-.sidebar{width:220px;background:linear-gradient(180deg,#0C1A19 0%,#0A1514 100%);border-right:1px solid var(--border);display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow-y:auto;flex-shrink:0;}
+.sidebar{width:220px;background:linear-gradient(180deg,#0C1A19 0%,#0A1514 100%);border-right:none;box-shadow:4px 0 18px rgba(15,25,20,.10);display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow-y:auto;flex-shrink:0;}
 .sidebar-logo{padding:16px 20px 14px;border-bottom:1px solid var(--border);}
 .sidebar-logo img.brand-logo{width:36px;height:36px;object-fit:contain;border-radius:6px;}
 .sidebar-logo img.brand-wordmark{width:120px;height:auto;object-fit:contain;margin-top:6px;display:block;}
@@ -69,28 +85,31 @@ body{font-family:'Inter',sans-serif;background:var(--black);color:var(--text);mi
 .sidebar-footer button:hover{color:var(--red);}
 .main{flex:1;min-width:0;}
 .page-header{padding:26px 32px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:var(--panel);position:sticky;top:0;z-index:10;}
-.page-title{font-size:20px;font-weight:700;}
+.page-title{font-size:20px;font-weight:800;}
 .page-sub{font-size:13px;color:var(--muted);margin-top:2px;}
-.content{padding:24px 32px;}
+.content{padding:26px 34px;max-width:1120px;}
 .bot-shell{display:flex;flex-direction:column;height:calc(100vh - 89px);}
 .bot-msgs{flex:1;overflow-y:auto;min-height:0;padding:20px 32px;}
 .bot-input{padding:16px 32px;border-top:1px solid var(--border);background:var(--panel);display:flex;gap:10px;}
 /* BUTTONS */
 .btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:8px;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer;border:none;transition:all .15s;}
-.btn-primary{background:var(--teal);color:#04201C;font-weight:700;}
+.btn-primary{background:var(--ink);color:var(--ink-gold);font-weight:700;box-shadow:var(--shadow);}
 .btn-primary:hover{opacity:.88;}
 .btn-ghost{background:transparent;color:var(--muted);border:1px solid var(--border2);}
-.btn-ghost:hover{background:var(--panel2);color:var(--text);}
+.btn-ghost:hover{background:var(--panel2);color:var(--text);border-color:var(--border2);}
 .btn-danger{background:rgba(224,82,82,.15);color:var(--red);border:1px solid rgba(224,82,82,.3);}
 .btn-green{background:rgba(95,184,122,.15);color:var(--green);border:1px solid rgba(95,184,122,.3);}
 .btn-sm{padding:5px 12px;font-size:12px;border-radius:6px;}
 /* CARDS */
-.card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:20px;}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:13px;padding:20px;box-shadow:var(--shadow);}
+.card[style*="cursor:pointer"]:hover,.card[style*="cursor: pointer"]:hover{border-color:var(--border2);box-shadow:0 3px 10px rgba(30,25,15,.09);}
 .card-grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;}
 .card-grid-2{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;}
-.stat-label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px;}
-.stat-value{font-size:26px;font-weight:700;}
-.stat-sub{font-size:12px;color:var(--muted);margin-top:4px;}
+.stat-label{font-size:10.5px;color:var(--muted2);text-transform:uppercase;letter-spacing:.09em;font-weight:700;margin-bottom:8px;}
+.stat-value{font-size:30px;font-weight:800;letter-spacing:-.02em;font-variant-numeric:tabular-nums;line-height:1;}
+.stat-sub{font-size:11.5px;color:var(--muted2);margin-top:7px;}
+.stat-chev{position:absolute;top:10px;right:13px;color:var(--muted2);font-size:16px;font-weight:700;line-height:1;}
+.stat-tap:active{transform:scale(.985);}
 /* CATEGORY */
 .cat-badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;}
 .cat-operations{background:rgba(91,143,212,.15);color:var(--cat-operations);}
@@ -139,9 +158,15 @@ body.modal-open{overflow:hidden;}
 /* PROOF */
 .proof-box{background:var(--panel2);border:1px solid var(--border2);border-radius:8px;padding:12px;margin-top:8px;}
 /* TASK CARD */
-.task-card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:18px;cursor:pointer;transition:border-color .2s;margin-bottom:12px;}
-.task-card:hover{border-color:var(--orange);}
-.task-card-title{font-size:15px;font-weight:700;margin-bottom:6px;}
+.task-card{background:var(--panel);border:1px solid var(--border);border-radius:13px;padding:18px;cursor:pointer;transition:all .15s;margin-bottom:12px;box-shadow:var(--shadow);}
+.task-card:hover{border-color:var(--border2);box-shadow:0 3px 10px rgba(30,25,15,.09);}
+.task-card-title{font-size:15.5px;font-weight:800;margin-bottom:4px;letter-spacing:-.01em;}
+.kebab{border:none;background:none;color:var(--muted2);font-size:18px;line-height:1;cursor:pointer;padding:2px 8px;border-radius:6px;font-family:inherit;}
+.kebab:hover{background:var(--panel2);color:var(--text);}
+.kmenu{position:absolute;right:0;top:26px;z-index:30;background:#fff;border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 24px rgba(30,25,15,.14);overflow:hidden;min-width:130px;}
+.kmenu button{display:block;width:100%;text-align:left;border:none;background:none;font-family:inherit;font-size:12.5px;font-weight:600;padding:9px 14px;cursor:pointer;color:var(--text);}
+.kmenu button:hover{background:var(--panel2);}
+.kmenu button.danger{color:var(--red);}
 /* STORE ROW */
 .store-row{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);}
 .store-row:last-child{border-bottom:none;}
@@ -160,25 +185,79 @@ body.modal-open{overflow:hidden;}
 .table-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:10px;}
 .table-wrap table{width:100%;border-collapse:collapse;font-size:13px;}
 .table-wrap th{background:var(--panel2);padding:10px 14px;text-align:left;font-size:11px;font-weight:700;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;border-bottom:1px solid var(--border);}
-.table-wrap td{padding:11px 14px;border-bottom:1px solid var(--border);vertical-align:middle;}
+.table-wrap td{padding:12px 14px;border-bottom:1px solid #F2EDE1;vertical-align:middle;}
 .acct-table th,.acct-table td{white-space:nowrap;vertical-align:middle;}
 .table-wrap tr:last-child td{border-bottom:none;}
-.table-wrap tr:hover td{background:rgba(255,255,255,.02);}
+.table-wrap tr:hover td{background:#FBF8F1;}
 /* BADGE */
-.badge{display:inline-block;padding:2px 10px;border-radius:999px;font-size:11px;font-weight:700;}
-.badge-green{background:rgba(95,184,122,.15);color:var(--green);}
-.badge-red{background:rgba(224,82,82,.15);color:var(--red);}
+.badge{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:999px;font-size:11px;font-weight:700;}
+.badge::before{content:'';width:6px;height:6px;border-radius:50%;background:currentColor;}
+.badge-green{background:#E8F4EC;color:var(--green);}
+.badge-red{background:#F9E9E7;color:var(--red);}
+.badge-gold{background:#F7EEDA;color:var(--gold-dim);}
+/* people cell */
+.pcell{display:flex;align-items:center;gap:10px;}
+.pava{width:30px;height:30px;border-radius:50%;font-size:11px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;flex:none;}
+.pava-0{background:#E8F0FA;color:#2C5F9E;}.pava-1{background:#F7EEDA;color:#8A6614;}.pava-2{background:#E8F4EC;color:#2E7D4F;}.pava-3{background:#F4E8F0;color:#8A4A6E;}
+/* page header refinement */
+.page-title{letter-spacing:-.01em;}
 
 /* ===== MOBILE RESPONSIVE ===== */
 @media (max-width:768px){
+  /* ===== app-shell mobile: table -> cards + bottom tab bar ===== */
+  .main{padding-bottom:74px;}
+  .page-header{background:var(--ink);border-bottom:none;}
+  .page-header .page-title{color:#F2EFE7;}
+  .page-header .page-sub{color:#93A19A;}
+  .table-wrap{overflow:visible;border:none;background:none;}
+  .table-wrap table{min-width:0;}
+  .table-wrap table,.table-wrap thead,.table-wrap tbody,.table-wrap tr,.table-wrap td,.table-wrap th{display:block;}
+  .table-wrap thead{display:none;}
+  .table-wrap tbody tr{background:var(--panel);border:1px solid var(--border);border-radius:13px;box-shadow:var(--shadow);padding:14px;margin-bottom:10px;}
+  .table-wrap tbody tr:hover td{background:none;}
+  .table-wrap td{border:none!important;padding:0;display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:30px;text-align:right;overflow-wrap:anywhere;word-break:break-word;}
+  .table-wrap td:not(:first-child){margin-top:8px;padding-top:8px;border-top:1px solid var(--line-soft)!important;}
+  .table-wrap td::before{content:attr(data-label);font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted2);font-weight:700;flex:none;text-align:left;}
+  .table-wrap td:empty{display:none;}
+  .table-wrap td .pcell{width:100%;}
+  .tabbar{display:flex;position:fixed;bottom:0;left:0;right:0;background:var(--panel);border-top:1px solid var(--border);padding:8px 4px calc(8px + env(safe-area-inset-bottom));z-index:60;}
+  .tb{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;color:var(--muted2);font-size:9.5px;font-weight:700;border:none;background:none;font-family:inherit;position:relative;cursor:pointer;padding:2px 0;min-width:0;}
+  .tb svg{width:22px;height:22px;}
+  .tb.on{color:var(--text);}
+  .tb.on svg{color:var(--gold-dim);}
+  .tb .tbadge{position:absolute;top:-2px;right:calc(50% - 18px);background:var(--red);color:#fff;font-size:8.5px;font-weight:800;min-width:15px;height:15px;border-radius:8px;display:flex;align-items:center;justify-content:center;padding:0 4px;}
+  /* mobile: tabbar + More sheet cover the full HQ nav */
+  .hq-nav{display:none!important;}
+  .portal-nav .nav-item[data-navkey="tasks"],.portal-nav .nav-item[data-navkey="announce"],
+  .portal-nav .nav-item[data-navkey="contact"],.portal-nav .nav-item[data-navkey="bot"],
+  .portal-nav .nav-item[data-navkey="password"]{display:none!important;}
+  body{overscroll-behavior-y:contain;}
+  .btn-sm{min-height:38px;}
+  .progress-bar{height:10px;border-radius:6px;}
+  .stat-value{font-size:26px;}
+  .stat-chev{top:12px;}
+  /* review rows: action buttons drop to their own right-aligned line */
+  .task-card>span[style*="flex-shrink: 0"]:last-child,.task-card>span:last-child{margin-left:auto;}
+  /* Tasks & Announcements mobile */
+  .filter-bar{display:flex;gap:8px;flex-wrap:wrap;}
+  .filter-bar select{flex:1 1 45%;min-width:0;font-size:13px;}
+  .task-card{padding:14px;}
+  .task-card-title{font-size:15px;}
+  .kmenu{right:0;}
+
   html,body{overflow-x:hidden;max-width:100%;}
   .auth-wrap{padding:16px;}
   .auth-card{width:100%!important;max-width:400px;padding:28px 22px;}
   .bot-msgs{padding:14px 16px!important;}
   .bot-input{padding:12px 16px!important;}
   .app{flex-direction:column;}
-  .sidebar{width:100%;height:auto;position:static;flex-direction:column;border-right:none;border-bottom:1px solid var(--border);padding-top:env(safe-area-inset-top);}
-  .sidebar-logo{padding:14px 16px 10px;}
+  .sidebar{width:100%;height:auto;position:static;border-right:none;border-bottom:none;padding:env(safe-area-inset-top) 12px 0 12px;flex-direction:row;align-items:center;justify-content:space-between;gap:8px;}
+  .sidebar-logo{padding:10px 4px;}
+  /* footer inline: user chip + actions in one slim row */
+  .sidebar .sidebar-footer{border-top:none;margin-top:0;padding:6px 0;flex-direction:row;align-items:center;gap:10px;}
+  .sidebar .sidebar-footer>div:first-child{margin:0!important;max-width:32vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .sidebar .sidebar-footer button{white-space:nowrap;}
+  .sidebar .sidebar-footer .build-stamp,.sidebar .sidebar-footer [data-hide-mobile]{display:none;}
   /* nav becomes a button grid: franchisee (<=6 items) = 2 rows, HQ (9 items) = 3 rows */
   .sidebar .nav{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;padding:8px 12px;}
   .nav-item{position:relative;display:flex;align-items:center;justify-content:center;text-align:center;white-space:normal;line-height:1.15;width:auto!important;min-height:34px;padding:5px 6px;font-size:12px;font-weight:600;border:1px solid var(--border2)!important;border-radius:9px;background:var(--panel2);}
@@ -424,11 +503,11 @@ const PROOF_TYPES = [
   {key:'checkbox', label:'Checkbox Only'},
 ];
 const STATUS_LABELS = {
-  pending:'Pending', in_progress:'In Progress',
-  submitted:'Submitted', approved:'Approved', rejected:'Rejected'
+  pending:'Not started', in_progress:'In progress',
+  submitted:'Waiting for HQ', approved:'Approved', rejected:'Needs changes'
 };
 
-function catStyle(k){const c=CATEGORIES.find(x=>x.key===k);return c?{background:c.color+'22',color:c.color}:{background:'rgba(255,255,255,.05)',color:'var(--muted)'};}
+function catStyle(k){const c=CATEGORIES.find(x=>x.key===k);return c?{background:c.color+'22',color:c.color}:{background:'#EFE9DB',color:'var(--muted)'};}
 function catLabel(k){return CATEGORIES.find(x=>x.key===k)?.label||k;}
 function fmtDate(ts){if(!ts)return'';return new Date(ts).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});}
 
@@ -457,7 +536,15 @@ function App(){
   const [session,setSession]=useState(null);
   const [profile,setProfile]=useState(null);
   const [loading,setLoading]=useState(true);
-  const [view,setView]=useState(()=>location.hash==='#install'?'password':'dashboard');
+  const HQ_VIEWS=['dashboard','tasks','broadcast','announce','messages','warnings','stores','review','accounts','password'];
+  const [view,setView]=useState(()=>{
+    if(window.location.hash==='#install')return 'password';
+    const h=readOpenHash();
+    return (h&&HQ_VIEWS.includes(h.view))?h.view:'dashboard';
+  });
+  const [focusId,setFocusId]=useState(()=>readOpenHash()?.id||null);
+  const [moreOpen,setMoreOpen]=useState(false);
+  useEffect(()=>{try{history.replaceState(null,'','#open='+view);}catch(e){}},[view]);
   const [recoveryMode,setRecoveryMode]=useState(false);
   const [linkError,setLinkError]=useState('');
 
@@ -538,7 +625,7 @@ function App(){
   }
   // Route by role
   if(profile?.role==='franchisee')return<FranchiseePortal session={session} profile={profile}/>;
-  return<MainApp view={view} setView={setView} session={session}/>;
+  return<MainApp view={view} setView={setView} session={session} focusId={focusId} setFocusId={setFocusId} moreOpen={moreOpen} setMoreOpen={setMoreOpen}/>;
 }
 
 function ResetPasswordScreen({onDone}){
@@ -635,12 +722,50 @@ function InstallBanner(){
 }
 
 
+// Compact notification toggle for the Accounts toolbar (installed app only).
+function QuickEnableNotifs(){
+  const[subOn,setSubOn]=React.useState(null);
+  const[busy,setBusy]=React.useState(false);
+  const[msg,setMsg]=React.useState('');
+  React.useEffect(()=>{(async()=>{
+    if(typeof Notification==='undefined'||!('serviceWorker'in navigator)){setSubOn(false);return;}
+    try{const reg=await navigator.serviceWorker.ready;const s=await reg.pushManager.getSubscription();setSubOn(!!s);}catch(e){setSubOn(false);}
+  })();},[]);
+  if(typeof Notification!=='undefined'&&Notification.permission==='denied'){
+    return <span className="btn btn-ghost btn-sm" style={{whiteSpace:'nowrap',cursor:'default',color:'var(--muted2)'}}>Notifications blocked in device settings</span>;
+  }
+  if(subOn){
+    return <span className="btn btn-ghost btn-sm" style={{whiteSpace:'nowrap',color:'var(--green)',borderColor:'rgba(95,184,122,.35)',cursor:'default'}}>✓ Notifications on</span>;
+  }
+  async function enable(){
+    setBusy(true);setMsg('');
+    try{
+      const p=await Notification.requestPermission();
+      if(p!=='granted'){setMsg('Not granted');setBusy(false);return;}
+      const reg=await navigator.serviceWorker.ready;
+      const sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:b64ToU8(VAPID_PUBLIC)});
+      const{data}=await sb.auth.getSession();
+      const uid=data&&data.session&&data.session.user?data.session.user.id:null;
+      if(!uid){setMsg('Sign in first');setBusy(false);return;}
+      const{error}=await sb.from('push_subscriptions').upsert([{endpoint:sub.endpoint,subscription:sub.toJSON(),user_id:uid,role:'hq',franchisee_id:null}],{onConflict:'endpoint'});
+      if(error){setMsg(error.message);}else setSubOn(true);
+    }catch(e){setMsg(e.message||String(e));}
+    setBusy(false);
+  }
+  return(
+    <span style={{display:'inline-flex',alignItems:'center',gap:6}}>
+      <button type="button" className="btn btn-gold btn-sm" disabled={busy} style={{whiteSpace:'nowrap'}} onClick={enable}>{busy?'Enabling...':'Enable notifications'}</button>
+      {msg&&<span style={{fontSize:11,color:'var(--muted2)'}}>{msg}</span>}
+    </span>
+  );
+}
+
 // Self-install button (Accounts toolbar): install this device, or show status.
 function InstallAppBtn(){
   const[,force]=React.useReducer(x=>x+1,0);
   const[guide,setGuide]=React.useState(false);
   React.useEffect(()=>{const f=()=>force();window.addEventListener('pwa-ready',f);return()=>window.removeEventListener('pwa-ready',f);},[]);
-  if(isStandalone())return <span className="btn btn-ghost btn-sm" style={{whiteSpace:'nowrap',color:'var(--green)',borderColor:'rgba(95,184,122,.35)',cursor:'default'}}>✓ Already installed</span>;
+  if(isStandalone())return <QuickEnableNotifs/>;
   if(window._pwaPrompt)return <button type="button" className="btn btn-gold btn-sm" style={{whiteSpace:'nowrap'}} onClick={async()=>{try{window._pwaPrompt.prompt();await window._pwaPrompt.userChoice;}catch(e){}force();}}>Install app</button>;
   return(
     <span style={{position:'relative',display:'inline-flex'}}>
@@ -719,7 +844,7 @@ function AuthScreen(){
   );
 }
 
-function MainApp({view,setView,session}){
+function MainApp({view,setView,session,focusId,setFocusId,moreOpen,setMoreOpen}){
   const [pendingCount,setPendingCount]=useState(0);
   const [unreadMsgs,setUnreadMsgs]=useState(0);
   const [pendingAccounts,setPendingAccounts]=useState(0);
@@ -761,12 +886,12 @@ function MainApp({view,setView,session}){
         <div className="sidebar-logo">
           <div className="brand">Ugly Donuts</div>
           <div className="app-tag">Franchise Ops</div>
-          <a href="https://uglycrm.netlify.app/" className="switch-link" style={{color:"#F26419",opacity:.75}}>← Back to Franchise OS</a>
+          <a href="/os.html" className="switch-link" style={{color:"#F26419",opacity:.75}}>← Back to Franchise OS</a>
         </div>
-        <nav className="nav">
+        <nav className="nav hq-nav">
           {navItems.map(n=>(
-            <button key={n.key} className={`nav-item ${view===n.key?'active':''}`} onClick={()=>setView(n.key)}>
-              <span className="nav-icon" style={{fontSize:15,width:20,textAlign:'center'}}>{n.icon}</span>{n.label}
+            <button key={n.key} data-navkey={n.key} className={`nav-item ${view===n.key?'active':''}`} onClick={()=>setView(n.key)}>
+              <span className="nav-icon" style={{width:20,display:'inline-flex',justifyContent:'center'}}><NavIcon k={n.key}/></span>{n.label}
               {n.badge?<span className="nav-badge">{n.badge}</span>:null}
             </button>
           ))}
@@ -777,43 +902,111 @@ function MainApp({view,setView,session}){
             <button onClick={()=>setView('password')}>⚙ Settings</button>
             <button onClick={()=>sb.auth.signOut()} style={{color:'var(--red)'}}>Sign out</button>
           </div>
-          <div style={{marginTop:6,fontSize:10,color:'var(--muted2)'}}>build 2026-06-24-v4</div>
+          <div className="build-stamp" style={{marginTop:6,fontSize:10,color:'var(--muted2)'}}>build 2026-06-24-v4</div>
         </div>
       </aside>
       <main className="main">
-        {view==='dashboard'&&<Dashboard setView={setView}/>}
+        {view==='dashboard'&&<Dashboard setView={setView} onReviewItem={(id)=>{setFocusId(id);setView('review');}}/>}
         {view==='tasks'&&<TaskList setView={setView}/>}
         {view==='broadcast'&&<BroadcastTask onDone={()=>setView('tasks')}/>}
         {view==='stores'&&<StoreList setView={setView}/>}
-        {view==='review'&&<HQReview/>}
+        {view==='review'&&<HQReview focusId={focusId} onFocusDone={()=>setFocusId(null)}/>}
         {view==='messages'&&<HQMessages onBadgeRefresh={refreshBadges}/>}
         {view==='warnings'&&<HQWarnings onUpdate={refreshBadges}/>}
         {view==='password'&&<><ChangePassword onDone={()=>setView('dashboard')}/><PwaCards profile={{id:session.user.id,role:'hq',franchisee_id:null}}/></>}
         {view==='accounts'&&<AccountManager onBadgeRefresh={refreshBadges}/>}
         {view==='announce'&&<Announcements/>}
       </main>
+      <nav className="tabbar">
+        {[
+          {v:'dashboard',label:'Home'},
+          {v:'tasks',label:'Tasks'},
+          {v:'review',label:'Review',badge:pendingCount||null},
+          {v:'messages',label:'Inbox',badge:unreadMsgs||null},
+        ].map(t=>(
+          <button key={t.v} className={`tb ${view===t.v&&!moreOpen?'on':''}`} onClick={()=>{setMoreOpen(false);setView(t.v);window.scrollTo(0,0);}}>
+            <span style={{display:'flex'}}><NavIcon k={t.v}/></span>
+            {t.label}
+            {t.badge?<span className="tbadge">{t.badge}</span>:null}
+          </button>
+        ))}
+        <button className={`tb ${moreOpen?'on':''}`} onClick={()=>setMoreOpen(o=>!o)}>
+          <svg width="17" height="17" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" viewBox="0 0 24 24"><circle cx="12" cy="12" r="1.6"/><circle cx="5" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>
+          More
+          {((reviewWarnings||0)+(pendingAccounts||0))?<span className="tbadge">{(reviewWarnings||0)+(pendingAccounts||0)}</span>:null}
+        </button>
+      </nav>
+      {moreOpen&&(
+        <div className="more-sheet-backdrop" onClick={e=>{if(e.target===e.currentTarget)setMoreOpen(false);}}>
+          <div className="more-sheet">
+            {[...navItems.filter(n=>!['dashboard','tasks','review','messages'].includes(n.key)),{key:'password',label:'Settings'}].map(n=>(
+              <button key={n.key} className="more-item" onClick={()=>{setView(n.key);setMoreOpen(false);window.scrollTo(0,0);}}>
+                <NavIcon k={n.key}/><span>{n.label}</span>
+                {n.badge?<span className="tbadge" style={{position:'static',marginLeft:'auto'}}>{n.badge}</span>:null}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
+// Hash deep-link reader: #open=view&id=xxx
+function readOpenHash(){
+  const m=(window.location.hash||'').match(/#open=([a-z]+)(?:&id=([\w-]+))?/);
+  return m?{view:m[1],id:m[2]||null}:null;
+}
+// Line icons for nav / tabbar (shared visual language)
+function NavIcon({k}){
+  const P={
+    dashboard:<path d="M3 12l9-9 9 9M5 10v10h5v-6h4v6h5V10"/>,
+    tasks:<><path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1.5"/><circle cx="4.5" cy="12" r="1.5"/><circle cx="4.5" cy="18" r="1.5"/></>,
+    broadcast:<><rect x="3" y="3" width="18" height="18" rx="4"/><path d="M12 8v8M8 12h8"/></>,
+    announce:<path d="M3 11l18-7-4 16-6-4-3 4-1-6z"/>,
+    messages:<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>,
+    contact:<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>,
+    warnings:<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>,
+    stores:<path d="M3 9l1-5h16l1 5M4 9v11h16V9M9 20v-6h6v6"/>,
+    review:<><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></>,
+    accounts:<><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></>,
+    password:<><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M2 12h3M19 12h3M4.9 19.1L7 17M17 7l2.1-2.1"/></>,
+    bot:<><circle cx="12" cy="12" r="9"/><circle cx="9" cy="10" r="1.3"/><circle cx="15" cy="10" r="1.3"/><path d="M8.5 14.5c1 1.2 2.2 1.8 3.5 1.8s2.5-.6 3.5-1.8"/></>,
+  };
+  return <svg width="17" height="17" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">{P[k]||P.dashboard}</svg>;
+}
+
+// Shared initials avatar (stores, people)
+function AvatarBadge({name,size}){
+  const n=(name||'?').trim()||'?';
+  const parts=n.split(/\s+/);
+  const ini=((parts[0][0]||'?')+(parts[1]?parts[1][0]:'')).toUpperCase();
+  let h=0;for(let i=0;i<n.length;i++)h=(h*31+n.charCodeAt(i))>>>0;
+  const sz=size||34;
+  return <span className={`pava pava-${h%4}`} style={{width:sz,height:sz,fontSize:sz*0.36}}>{ini}</span>;
+}
+
 // ── DASHBOARD ─────────────────────────────────────────────
-function Dashboard({setView}){
+function Dashboard({setView,onReviewItem}){
   const [stats,setStats]=useState({stores:0,activeTasks:0,pending:0});
   const [taskStats,setTaskStats]=useState([]);
   const [storeStats,setStoreStats]=useState([]);
   const [announceStats,setAnnounceStats]=useState([]);
   const [popup,setPopup]=useState(null); // 'stores' | 'tasks' | 'pending'
+  const [actions,setActions]=useState({submitted:[],unreadMsgs:0,warnToReview:0});
   const [popupData,setPopupData]=useState([]);
 
   useEffect(()=>{
     async function load(){
-      const[storesRes,tasksRes,assignRes,annRes,annReceiptRes,profRes]=await Promise.all([
+      const[storesRes,tasksRes,assignRes,annRes,annReceiptRes,profRes,msgRes,warnRes]=await Promise.all([
         sb.from('franchisees').select('id,name,store_name,territory').in('status',['open','soft_open']),
         sb.from('ops_tasks').select('*').eq('status','active').order('created_at',{ascending:false}),
-        sb.from('ops_assignments').select('ops_task_id,franchisee_id,status'),
+        sb.from('ops_assignments').select('id,ops_task_id,franchisee_id,status,updated_at'),
         sb.from('ops_announcements').select('*').eq('status','active').order('created_at',{ascending:false}),
         sb.from('ops_announcement_receipts').select('announcement_id,franchisee_id,confirmed'),
         sb.from('profiles').select('franchisee_id').eq('role','franchisee'),
+        sb.from('ops_messages').select('id',{count:'exact',head:true}).eq('is_read',false),
+        sb.from('ops_warnings').select('id',{count:'exact',head:true}).eq('status','submitted'),
       ]);
       const stores=storesRes.data||[];
       const tasks=tasksRes.data||[];
@@ -823,6 +1016,15 @@ function Dashboard({setView}){
       const linkedIds=new Set((profRes.data||[]).map(p=>p.franchisee_id).filter(Boolean));
       const pending=assigns.filter(a=>a.status==='submitted').length;
       setStats({stores:stores.length,activeTasks:tasks.length,pending});
+
+      // Action center: what needs HQ right now, joined client-side
+      const storeById={};stores.forEach(x=>storeById[x.id]=x);
+      const taskById={};tasks.forEach(x=>taskById[x.id]=x);
+      const submittedRows=assigns.filter(a=>a.status==='submitted')
+        .map(a=>({id:a.id,store:(storeById[a.franchisee_id]||{}).store_name||(storeById[a.franchisee_id]||{}).name||'Store',
+                  task:(taskById[a.ops_task_id]||{}).title||'Task',when:a.updated_at}))
+        .sort((x,y)=>String(x.when||'').localeCompare(String(y.when||'')));
+      setActions({submitted:submittedRows,unreadMsgs:msgRes.count||0,warnToReview:warnRes.count||0});
 
       // Per-task completion rates
       const perTask=tasks.map(t=>{
@@ -891,30 +1093,74 @@ function Dashboard({setView}){
         </div>
       </div>
       <div className="content">
+        {/* Action center: answers "what do I need to do right now?" */}
+        {(()=>{
+          const nAct=actions.submitted.length+(actions.unreadMsgs?1:0)+(actions.warnToReview?1:0);
+          const ago=(iso)=>{if(!iso)return'';const h=Math.max(0,Math.round((Date.now()-new Date(iso))/36e5));return h<1?'just now':h<24?h+'h ago':Math.round(h/24)+'d ago';};
+          return(
+            <div className="card" style={{marginBottom:20,padding:0,overflow:'hidden',borderColor:nAct?'#EDD9A8':'var(--border)'}}>
+              <div style={{display:'flex',alignItems:'center',gap:10,padding:'14px 18px',borderBottom:nAct?'1px solid var(--line-soft, #F2EDE1)':'none',background:nAct?'linear-gradient(180deg,#FFFDF7,#FFF)':'#fff'}}>
+                <span style={{fontWeight:800,fontSize:15}}>Needs your action</span>
+                {nAct>0
+                  ?<span style={{background:'var(--ink,#14201E)',color:'var(--ink-gold,#F0D68A)',fontSize:11,fontWeight:800,borderRadius:10,padding:'2px 9px'}}>{actions.submitted.length+actions.unreadMsgs+actions.warnToReview}</span>
+                  :<span style={{color:'var(--green)',fontSize:12.5,fontWeight:700}}>✓ All clear</span>}
+              </div>
+              {actions.submitted.slice(0,5).map(r=>(
+                <div key={r.id} style={{display:'flex',alignItems:'center',gap:12,padding:'11px 18px',borderBottom:'1px solid #F2EDE1'}}>
+                  <span className="badge badge-gold" style={{flex:'none'}}>Review</span>
+                  <span style={{minWidth:0,display:'flex',flexDirection:'column',gap:1}}>
+                    <span style={{fontSize:13.5,fontWeight:700,color:'var(--text)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.store}</span>
+                    <span style={{fontSize:11.5,color:'var(--muted)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.task}</span>
+                  </span>
+                  <span style={{marginLeft:'auto',flex:'none',fontSize:11,color:'var(--muted2)'}}>{ago(r.when)}</span>
+                  <button className="btn btn-primary btn-sm" style={{flex:'none'}} onClick={()=>onReviewItem?onReviewItem(r.id):setView('review')}>Review</button>
+                </div>
+              ))}
+              {actions.submitted.length>5&&(
+                <div style={{padding:'9px 18px',borderBottom:'1px solid #F2EDE1',fontSize:12.5,color:'var(--muted)'}}>+ {actions.submitted.length-5} more waiting · <span style={{color:'var(--gold-dim)',fontWeight:700,cursor:'pointer'}} onClick={()=>setView('review')}>open HQ Review →</span></div>
+              )}
+              {actions.unreadMsgs>0&&(
+                <div style={{display:'flex',alignItems:'center',gap:12,padding:'11px 18px',borderBottom:'1px solid #F2EDE1'}}>
+                  <span className="badge badge-gold" style={{flex:'none'}}>Reply</span>
+                  <span style={{fontSize:13.5,fontWeight:700}}>Store messages</span>
+                  <span style={{fontSize:11.5,color:'var(--muted)'}}>{actions.unreadMsgs} unread</span>
+                  <button className="btn btn-primary btn-sm" style={{marginLeft:'auto',flex:'none'}} onClick={()=>setView('messages')}>Open</button>
+                </div>
+              )}
+              {actions.warnToReview>0&&(
+                <div style={{display:'flex',alignItems:'center',gap:12,padding:'11px 18px'}}>
+                  <span className="badge badge-red" style={{flex:'none'}}>Respond</span>
+                  <span style={{fontSize:13.5,fontWeight:700}}>Warning responses</span>
+                  <span style={{fontSize:11.5,color:'var(--muted)'}}>{actions.warnToReview} waiting</span>
+                  <button className="btn btn-primary btn-sm" style={{marginLeft:'auto',flex:'none'}} onClick={()=>setView('warnings')}>Open</button>
+                </div>
+              )}
+            </div>
+          );
+        })()}
         {/* Top stats */}
         <div className="card-grid-4" style={{marginBottom:24}}>
-          <div className="card" style={{cursor:'pointer'}} onClick={()=>setPopup('stores')}>
-            <div className="stat-label">Open Stores</div><div className="stat-value" style={{color:'var(--green)'}}>{stats.stores}</div>
-            <div className="stat-sub">Operational · <span style={{color:'var(--green)'}}>View →</span></div>
+          <div className="card stat-tap" style={{cursor:'pointer',position:'relative'}} onClick={()=>setPopup('stores')}>
+            <span className="stat-chev">›</span>
+            <div className="stat-label">Open Stores</div><div className="stat-value">{stats.stores}</div>
           </div>
-          <div className="card" style={{cursor:'pointer'}} onClick={()=>setPopup('tasks')}>
-            <div className="stat-label">Active Tasks</div><div className="stat-value" style={{color:'var(--orange)'}}>{stats.activeTasks}</div>
-            <div className="stat-sub">Broadcast tasks · <span style={{color:'var(--orange)'}}>View →</span></div>
+          <div className="card stat-tap" style={{cursor:'pointer',position:'relative'}} onClick={()=>setPopup('tasks')}>
+            <span className="stat-chev">›</span>
+            <div className="stat-label">Active Tasks</div><div className="stat-value">{stats.activeTasks}</div>
           </div>
-          <div className="card" style={{cursor:'pointer'}} onClick={()=>setPopup('pending')}>
-            <div className="stat-label">Pending Review</div><div className="stat-value" style={{color:stats.pending>0?'var(--gold)':'var(--text)'}}>{stats.pending}</div>
-            <div className="stat-sub">Awaiting HQ approval · <span style={{color:'var(--gold)'}}>View →</span></div>
+          <div className="card stat-tap" style={{cursor:'pointer',position:'relative'}} onClick={()=>setPopup('pending')}>
+            <span className="stat-chev">›</span>
+            <div className="stat-label">Pending Review</div><div className="stat-value" style={{color:stats.pending>0?'var(--gold-dim)':'var(--text)'}}>{stats.pending}</div>
           </div>
           <div className="card">
-            <div className="stat-label">Overall Rate</div><div className="stat-value" style={{color:overallPct===100?'var(--green)':overallPct>50?'var(--gold)':'var(--text)'}}>{overallPct}%</div>
-            <div className="stat-sub">Approved across all tasks</div>
+            <div className="stat-label">Overall Rate</div><div className="stat-value" style={{color:overallPct===100?'var(--green)':'var(--text)'}}>{overallPct}%</div>
           </div>
         </div>
 
         {/* Task-by-task completion */}
         <div className="card" style={{marginBottom:16}}>
           <div style={{fontWeight:700,marginBottom:16,display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-            Task Completion by Task
+            <span style={{display:'flex',alignItems:'center'}}><span style={{width:26,height:26,borderRadius:8,background:'#E8F0FA',color:'#2C5F9E',display:'inline-flex',alignItems:'center',justifyContent:'center',flexShrink:0,marginRight:10}}><svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1.5"/><circle cx="4.5" cy="12" r="1.5"/><circle cx="4.5" cy="18" r="1.5"/></svg></span>Task Completion</span>
             <button className="btn btn-ghost btn-sm" onClick={()=>setView('tasks')}>See all →</button>
           </div>
           {taskStats.length===0&&<div style={{color:'var(--muted)',fontSize:13}}>No active tasks yet.</div>}
@@ -925,17 +1171,14 @@ function Dashboard({setView}){
                 <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:6}}>
                   <span className={`cat-badge cat-${t.category}`}>{catLabel(t.category)}</span>
                   <span style={{flex:1,fontSize:13,fontWeight:600}}>{t.title}</span>
-                  <div style={{display:'flex',gap:10,alignItems:'center',flexShrink:0}}>
-                    {t.submitted>0&&<span style={{fontSize:11,color:'var(--gold)',fontWeight:600}}>{t.submitted} pending review</span>}
-                    {days!==null&&<span style={{fontSize:11,color:days<0?'var(--red)':days<=3?'var(--orange)':'var(--muted)',whiteSpace:'nowrap'}}>{days<0?`${Math.abs(days)}d late`:days===0?'Due today':`${days}d left`}</span>}
-                    <span style={{fontSize:12,fontWeight:700,color:t.pct===100?'var(--green)':t.pct>50?'var(--gold)':'var(--muted)',minWidth:36,textAlign:'right'}}>{t.pct}%</span>
+                  <div style={{display:'flex',gap:8,alignItems:'center',flexShrink:0}}>
+                    {t.submitted>0&&<span className="badge badge-gold">{t.submitted}</span>}
+                    {days!==null&&days<=3&&<span style={{fontSize:11,fontWeight:700,color:days<0?'var(--red)':'var(--gold-dim)',whiteSpace:'nowrap'}}>{days<0?`${Math.abs(days)}d late`:days===0?'today':`${days}d`}</span>}
+                    <span style={{fontSize:12.5,fontWeight:800,color:t.pct===100?'var(--green)':'var(--text)',minWidth:40,textAlign:'right',fontVariantNumeric:'tabular-nums'}}>{t.approved}<span style={{color:'var(--muted2)',fontWeight:600}}>/{t.total}</span></span>
                   </div>
                 </div>
-                <div style={{display:'flex',alignItems:'center',gap:10}}>
-                  <div className="progress-bar" style={{flex:1}}>
-                    <div className="progress-fill" style={{width:`${t.pct}%`,background:t.pct===100?'var(--green)':'var(--orange)'}}/>
-                  </div>
-                  <span style={{fontSize:11,color:'var(--muted)',whiteSpace:'nowrap'}}>{t.approved}/{t.total} stores</span>
+                <div className="progress-bar">
+                  <div className="progress-fill" style={{width:`${t.pct}%`,background:t.pct===100?'var(--green)':'linear-gradient(90deg,#CC9C3A,#E3BE64)'}}/>
                 </div>
               </div>
             );
@@ -945,7 +1188,7 @@ function Dashboard({setView}){
         {/* Store-level breakdown */}
         <div className="card">
           <div style={{fontWeight:700,marginBottom:14,display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-            Store Completion (All Tasks)
+            <span style={{display:'flex',alignItems:'center'}}><span style={{width:26,height:26,borderRadius:8,background:'#E8F4EC',color:'#2E7D4F',display:'inline-flex',alignItems:'center',justifyContent:'center',flexShrink:0,marginRight:10}}><svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M3 9l1-5h16l1 5M4 9v11h16V9M9 20v-6h6v6"/></svg></span>Store Completion</span>
             <button className="btn btn-ghost btn-sm" onClick={()=>setView('stores')}>See stores →</button>
           </div>
           {storeStats.length===0&&<div style={{color:'var(--muted)',fontSize:13}}>No data yet.</div>}
@@ -973,7 +1216,7 @@ function Dashboard({setView}){
         {/* Announcement confirmation rates */}
         <div className="card" style={{marginTop:16}}>
           <div style={{fontWeight:700,marginBottom:14,display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-            Announcement Confirmations
+            <span style={{display:'flex',alignItems:'center'}}><span style={{width:26,height:26,borderRadius:8,background:'#F7EEDA',color:'#8A6614',display:'inline-flex',alignItems:'center',justifyContent:'center',flexShrink:0,marginRight:10}}><svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M3 11l18-7-4 16-6-4-3 4-1-6z"/></svg></span>Announcement Confirmations</span>
             <button className="btn btn-ghost btn-sm" onClick={()=>setView('tasks')}>Manage →</button>
           </div>
           {announceStats.length===0&&<div style={{color:'var(--muted)',fontSize:13}}>No active announcements.</div>}
@@ -1136,6 +1379,7 @@ function TaskList({setView}){
 function AnnouncementsSummary(){
   const [announcements,setAnnouncements]=useState([]);
   const [loading,setLoading]=useState(true);
+  const [openId,setOpenId]=useState(null);
 
   useEffect(()=>{
     sb.from('ops_announcements').select('*').neq('status','archived').order('created_at',{ascending:false}).limit(10)
@@ -1169,9 +1413,9 @@ function AnnouncementsSummary(){
                 <span style={{fontSize:11,fontWeight:700,background:color+'22',color,padding:'2px 8px',borderRadius:999,textTransform:'uppercase'}}>{catLbl(ann.category)}</span>
                 <span style={{fontSize:14,fontWeight:700}}>{ann.title}</span>
               </div>
-              <span style={{fontSize:11,color:'var(--muted)'}}>{new Date(ann.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}</span>
+              <span style={{fontSize:11,color:'var(--muted2)',flex:'none'}}>{new Date(ann.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric'})}</span>
             </div>
-            <div style={{fontSize:12,color:'var(--muted)',lineHeight:1.5}}>{ann.body.length>120?ann.body.slice(0,120)+'...':ann.body}</div>
+            <div onClick={()=>setOpenId(openId===ann.id?null:ann.id)} style={{fontSize:12,color:'var(--muted)',lineHeight:1.55,cursor:'pointer',...(openId===ann.id?{}:{overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'})}}>{ann.body}{openId!==ann.id&&ann.body.length>90?' ':''}</div>
             {(ann.attachment_url||ann.link_url)&&(
               <div style={{marginTop:8,display:'flex',gap:8}}>
                 {ann.attachment_url&&<a href={ann.attachment_url} target="_blank" rel="noreferrer" style={{fontSize:11,color:'var(--gold)',textDecoration:'none'}}>📎 {ann.attachment_name||'Attachment'}</a>}
@@ -1203,37 +1447,45 @@ function TaskCard({task,onClick,onRefresh}){
     onRefresh();
   }
 
+  const [menu,setMenu]=useState(false);
   return(
     <div className="task-card" onClick={onClick}>
-      <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',marginBottom:8}}>
-        <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
-          <span className={`cat-badge cat-${task.category}`}>{catLabel(task.category)}</span>
-          {task.require_hq_approval&&<span style={{fontSize:10,background:'rgba(155,120,212,.15)',color:'var(--purple)',padding:'2px 6px',borderRadius:4,fontWeight:700}}>HQ APPROVAL</span>}
-        </div>
-        <div style={{display:'flex',gap:8,alignItems:'center'}}>
-          {days!==null&&<span style={{fontSize:11,color:days<0?'var(--red)':days<=3?'var(--orange)':'var(--muted)',fontWeight:600}}>{days<0?`${Math.abs(days)}d overdue`:days===0?'Due today':`${days}d left`}</span>}
-          <button className="btn btn-ghost btn-sm" onClick={archive} style={{fontSize:11,padding:'2px 8px'}}>Archive</button>
-          <button className="btn btn-danger btn-sm" onClick={async(e)=>{e.stopPropagation();if(!window.confirm('Permanently delete this task and all store assignments? This cannot be undone.'))return;await sb.from('ops_tasks').delete().eq('id',task.id);onRefresh();}} style={{fontSize:11,padding:'2px 8px'}}>Delete</button>
-        </div>
+      <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8}}>
+        <span className={`cat-badge cat-${task.category}`}>{catLabel(task.category)}</span>
+        {task.require_hq_approval&&<span title="Requires HQ approval" style={{fontSize:10,background:'#EFE9F8',color:'var(--purple)',padding:'2px 7px',borderRadius:4,fontWeight:800,letterSpacing:'.04em'}}>HQ ✓</span>}
+        <span style={{marginLeft:'auto'}}/>
+        {days!==null&&days<=3&&<span style={{fontSize:11.5,fontWeight:800,color:days<0?'var(--red)':'var(--gold-dim)',whiteSpace:'nowrap'}}>{days<0?`${Math.abs(days)}d overdue`:days===0?'Due today':`${days}d left`}</span>}
+        <span style={{position:'relative'}} onClick={e=>e.stopPropagation()}>
+          <button className="kebab" onClick={()=>setMenu(m=>!m)} aria-label="Task actions">⋯</button>
+          {menu&&(
+            <span className="kmenu" onMouseLeave={()=>setMenu(false)}>
+              <button onClick={(e)=>{setMenu(false);archive(e);}}>Archive</button>
+              <button className="danger" onClick={async(e)=>{e.stopPropagation();setMenu(false);if(!window.confirm('Permanently delete this task and all store assignments? This cannot be undone.'))return;await sb.from('ops_tasks').delete().eq('id',task.id);onRefresh();}}>Delete</button>
+            </span>
+          )}
+        </span>
       </div>
       <div className="task-card-title">{task.title}</div>
-      {task.description&&<div style={{fontSize:12,color:'var(--muted)',marginBottom:10,lineHeight:1.5}}>{task.description}</div>}
-      <div style={{display:'flex',alignItems:'center',gap:14,marginBottom:8}}>
-        <span style={{fontSize:12,color:'var(--muted)'}}>Due: {fmtDate(task.due_date)||'No date'}</span>
-        <span style={{fontSize:12,color:'var(--muted)'}}>Target: {task.target==='all'?'All open stores':`${(task.target||'').split(',').length} selected store${(task.target||'').split(',').length!==1?'s':''}`}</span>
+      <div style={{fontSize:12,color:'var(--muted)',marginBottom:12,display:'flex',gap:12,flexWrap:'wrap'}}>
+        {task.due_date&&<span style={{fontWeight:600,color:'var(--muted)'}}>Due {fmtDate(task.due_date)}</span>}
+        <span>{task.target==='all'?'All stores':`${(task.target||'').split(',').length} store${(task.target||'').split(',').length!==1?'s':''} only`}</span>
+        {task.description&&<span style={{overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',maxWidth:'60%'}}>{task.description}</span>}
       </div>
       {stats.total>0&&(
         <>
-          <div style={{display:'flex',justifyContent:'space-between',fontSize:12,marginBottom:4}}>
-            <span style={{color:'var(--muted)'}}>{stats.approved}/{stats.total} approved</span>
-            <span style={{display:'flex',gap:10}}>
-              {stats.submitted>0&&<span style={{color:'var(--gold)'}}>{stats.submitted} pending review</span>}
-              {stats.pending>0&&<span style={{color:'var(--muted)'}}>{stats.pending} not started</span>}
-            </span>
+          <div style={{display:'flex',alignItems:'center',gap:12}}>
+            <div className="progress-bar" style={{flex:1,display:'flex',overflow:'hidden'}}>
+              <div style={{width:`${stats.approved/stats.total*100}%`,background:'var(--green)',transition:'width .3s'}}/>
+              <div style={{width:`${stats.submitted/stats.total*100}%`,background:'linear-gradient(90deg,#CC9C3A,#E3BE64)',transition:'width .3s'}}/>
+            </div>
+            <span style={{fontSize:12.5,fontWeight:800,fontVariantNumeric:'tabular-nums',color:pct===100?'var(--green)':'var(--text)'}}>{stats.approved}<span style={{color:'var(--muted2)',fontWeight:600}}>/{stats.total}</span></span>
           </div>
-          <div className="progress-bar">
-            <div className="progress-fill" style={{width:`${pct}%`,background:pct===100?'var(--green)':'var(--orange)'}}/>
-          </div>
+          {(stats.submitted>0||stats.pending>0)&&(
+            <div style={{display:'flex',gap:12,marginTop:6,fontSize:11,color:'var(--muted)'}}>
+              {stats.submitted>0&&<span><span style={{display:'inline-block',width:7,height:7,borderRadius:'50%',background:'#CC9C3A',marginRight:5}}/>{stats.submitted} in review</span>}
+              {stats.pending>0&&<span><span style={{display:'inline-block',width:7,height:7,borderRadius:'50%',background:'var(--border2)',marginRight:5}}/>{stats.pending} not started</span>}
+            </div>
+          )}
         </>
       )}
     </div>
@@ -1373,7 +1625,7 @@ function TaskDetailModal({task,onClose}){
                     {st.description&&<div style={{fontSize:11,color:'var(--muted)',marginTop:2}}>{st.description}</div>}
                   </div>
                   <div style={{display:'flex',gap:8,alignItems:'center'}}>
-                    <span style={{fontSize:11,background:'rgba(255,255,255,.05)',padding:'2px 8px',borderRadius:4,color:'var(--muted)'}}>
+                    <span style={{fontSize:11,background:'#EFE9DB',padding:'2px 8px',borderRadius:4,color:'var(--muted)'}}>
                       {PROOF_TYPES.find(p=>p.key===st.proof_type)?.label||st.proof_type}
                     </span>
                     {st.is_required&&<span style={{fontSize:10,color:'var(--red)',fontWeight:700}}>REQUIRED</span>}
@@ -1484,7 +1736,7 @@ function AssignmentDetailModal({assignment,subtasks,onClose,onApprove,onReject})
                       {comp.proof_text&&<div style={{fontSize:13,color:'var(--text)',marginBottom:comp.proof_image_url?8:0}}>{comp.proof_text}</div>}
                       {comp.proof_image_url&&(
                         <div>
-                          <img src={comp.proof_image_url} alt="proof" style={{maxWidth:'100%',maxHeight:200,borderRadius:6,objectFit:'cover',cursor:'pointer'}} onClick={()=>window.open(comp.proof_image_url,'_blank')}/>
+                          <img src={comp.proof_image_url} alt="proof" style={{width:'100%',maxHeight:420,borderRadius:9,objectFit:'contain',background:'var(--panel2)',cursor:'pointer'}} onClick={()=>window.open(comp.proof_image_url,'_blank')}/>
                         </div>
                       )}
                       {!comp.proof_text&&!comp.proof_image_url&&<div style={{fontSize:12,color:'var(--muted)'}}>Marked complete (no proof uploaded)</div>}
@@ -1506,8 +1758,8 @@ function AssignmentDetailModal({assignment,subtasks,onClose,onApprove,onReject})
           <button className="btn btn-ghost" onClick={onClose}>Close</button>
           {assignment.status==='submitted'&&(
             <>
-              <button className="btn btn-danger" onClick={onReject}>Reject</button>
-              <button className="btn btn-green" onClick={onApprove}>Approve ✓</button>
+              <button className="btn btn-ghost" style={{color:'var(--red)',borderColor:'rgba(190,74,62,.35)'}} onClick={onReject}>Needs changes</button>
+              <button className="btn btn-primary" style={{minWidth:140}} onClick={onApprove}>Approve ✓</button>
             </>
           )}
         </div>
@@ -1775,28 +2027,25 @@ function StoreList({setView}){
                     </div>
                   </div>
                   {unregistered.map(s=>{
-                    const myAssigns=assignments.filter(a=>a.franchisee_id===s.id);
-                    const submitted=myAssigns.filter(a=>a.status==='submitted').length;
                     return(
-                      <div key={s.id} style={{background:'var(--panel)',border:'1px solid rgba(224,82,82,.25)',borderRadius:12,padding:18,marginBottom:10,cursor:'pointer',transition:'border-color .2s',position:'relative'}}
-                        onClick={()=>setSelected(s)}
-                        onMouseEnter={e=>e.currentTarget.style.borderColor='var(--red)'}
-                        onMouseLeave={e=>e.currentTarget.style.borderColor='rgba(224,82,82,.25)'}>
-                        <div style={{position:'absolute',top:12,right:12}}>
-                          <span style={{fontSize:10,fontWeight:700,background:'rgba(224,82,82,.15)',color:'var(--red)',padding:'3px 8px',borderRadius:4}}>NO ACCOUNT</span>
+                      <div key={s.id} className="task-card" style={{borderColor:'rgba(190,74,62,.3)'}} onClick={()=>setSelected(s)}>
+                        <div style={{display:'flex',alignItems:'center',gap:12}}>
+                          <AvatarBadge name={s.store_name||s.name}/>
+                          <span style={{minWidth:0,flex:1,display:'flex',flexDirection:'column',gap:1}}>
+                            <span style={{display:'flex',alignItems:'center',gap:8,minWidth:0}}>
+                              <span style={{fontSize:14.5,fontWeight:800,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{s.store_name||s.name}</span>
+                              <span className="badge badge-red" style={{flexShrink:0}}>No account</span>
+                            </span>
+                            <span style={{fontSize:11.5,color:'var(--muted)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{s.store_name&&s.name?s.name+' · ':''}{s.territory}</span>
+                          </span>
+                          {s.email&&(
+                            <button className="btn btn-primary btn-sm" style={{flexShrink:0}} onClick={e=>{e.stopPropagation();setView&&setView('accounts');}}>+ Create account</button>
+                          )}
                         </div>
-                        <div style={{fontSize:15,fontWeight:700,marginBottom:2,paddingRight:96}}>{s.store_name||s.name}</div>
-                        <div style={{fontSize:12,color:'var(--muted)',marginBottom:8}}>{s.store_name&&<span style={{marginRight:6}}>{s.name} ·</span>}{s.territory}</div>
-                        <div style={{display:'flex',gap:10,alignItems:'center',flexWrap:'wrap'}}>
-                          {s.email&&<a href={`mailto:${s.email}`} onClick={e=>e.stopPropagation()} style={{fontSize:12,color:'var(--blue)',textDecoration:'none',wordBreak:'break-all'}}>✉ {s.email}</a>}
-                          {s.phone&&<a href={`tel:${s.phone}`} onClick={e=>e.stopPropagation()} style={{fontSize:12,color:'var(--green)',textDecoration:'none'}}>📞 {s.phone}</a>}
-                          {submitted>0&&<span style={{fontSize:12,color:'var(--gold)',fontWeight:600,marginLeft:'auto'}}>{submitted} pending</span>}
+                        <div style={{display:'flex',gap:16,flexWrap:'wrap',fontSize:12,marginTop:10}}>
+                          {s.email&&<a href={`mailto:${s.email}`} onClick={e=>e.stopPropagation()} style={{color:'var(--blue)',textDecoration:'none',wordBreak:'break-all'}}>✉ {s.email}</a>}
+                          {s.phone&&<a href={`tel:${s.phone}`} onClick={e=>e.stopPropagation()} style={{color:'var(--green)',textDecoration:'none'}}>📞 {s.phone}</a>}
                         </div>
-                        {s.email&&(
-                          <button className="btn btn-primary btn-sm" style={{marginTop:10}} onClick={e=>{e.stopPropagation();setView&&setView('accounts');}}>
-                            + Create Ops Account →
-                          </button>
-                        )}
                       </div>
                     );
                   })}
@@ -1808,20 +2057,34 @@ function StoreList({setView}){
                 <div>
                   {unregistered.length>0&&<div style={{fontSize:11,fontWeight:700,color:'var(--muted)',letterSpacing:'.08em',textTransform:'uppercase',marginBottom:10}}>Active Accounts ({registered.length})</div>}
                   {registered.map(s=>{
-                    const myAssigns=assignments.filter(a=>a.franchisee_id===s.id);
+                    const activeIds=new Set(tasks.map(t=>t.id));
+                    const myAssigns=assignments.filter(a=>a.franchisee_id===s.id&&activeIds.has(a.ops_task_id));
                     const submitted=myAssigns.filter(a=>a.status==='submitted').length;
+                    const approved=myAssigns.filter(a=>a.status==='approved').length;
+                    const total=myAssigns.length;
                     return(
-                      <div key={s.id} style={{background:'var(--panel)',border:'1px solid var(--border)',borderRadius:12,padding:18,marginBottom:10,cursor:'pointer',transition:'border-color .2s'}}
-                        onClick={()=>setSelected(s)}
-                        onMouseEnter={e=>e.currentTarget.style.borderColor='var(--orange)'}
-                        onMouseLeave={e=>e.currentTarget.style.borderColor='var(--border)'}>
-                        <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',marginBottom:4}}>
-                          <div style={{fontSize:15,fontWeight:700}}>{s.store_name||s.name}</div>
-                          <span style={{fontSize:10,fontWeight:700,background:'rgba(95,184,122,.15)',color:'var(--green)',padding:'2px 6px',borderRadius:4,flexShrink:0,whiteSpace:'nowrap'}}>✓ ACTIVE</span>
-                          {submitted>0&&<span style={{fontSize:12,color:'var(--gold)',fontWeight:600,marginLeft:'auto'}}>{submitted} pending</span>}
+                      <div key={s.id} className="task-card" onClick={()=>setSelected(s)}>
+                        <div style={{display:'flex',alignItems:'center',gap:12}}>
+                          <AvatarBadge name={s.store_name||s.name}/>
+                          <span style={{minWidth:0,flex:1,display:'flex',flexDirection:'column',gap:1}}>
+                            <span style={{display:'flex',alignItems:'center',gap:8,minWidth:0}}>
+                              <span style={{fontSize:14.5,fontWeight:800,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{s.store_name||s.name}</span>
+                              <span className="badge badge-green" style={{flexShrink:0}}>Active</span>
+                            </span>
+                            <span style={{fontSize:11.5,color:'var(--muted)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{s.store_name&&s.name?s.name+' · ':''}{s.territory}</span>
+                          </span>
+                          {submitted>0&&<span className="badge badge-gold" style={{flexShrink:0}} title="Waiting for your review">{submitted}</span>}
                         </div>
-                        <div style={{fontSize:12,color:'var(--muted)',marginBottom:8}}>{s.store_name&&<span style={{marginRight:6}}>{s.name} ·</span>}{s.territory}</div>
-                        <div style={{display:'flex',gap:16,flexWrap:'wrap',fontSize:12}}>
+                        {total>0&&(
+                          <div style={{display:'flex',alignItems:'center',gap:12,marginTop:12}}>
+                            <div className="progress-bar" style={{flex:1,display:'flex',overflow:'hidden'}}>
+                              <div style={{width:`${approved/total*100}%`,background:'var(--green)'}}/>
+                              <div style={{width:`${submitted/total*100}%`,background:'linear-gradient(90deg,#CC9C3A,#E3BE64)'}}/>
+                            </div>
+                            <span style={{fontSize:12.5,fontWeight:800,fontVariantNumeric:'tabular-nums',color:approved===total?'var(--green)':'var(--text)'}}>{approved}<span style={{color:'var(--muted2)',fontWeight:600}}>/{total}</span></span>
+                          </div>
+                        )}
+                        <div style={{display:'flex',gap:16,flexWrap:'wrap',fontSize:12,marginTop:10}}>
                           {s.email&&<a href={`mailto:${s.email}`} onClick={e=>e.stopPropagation()} style={{color:'var(--blue)',textDecoration:'none',wordBreak:'break-all'}}>✉ {s.email}</a>}
                           {s.phone&&<a href={`tel:${s.phone}`} onClick={e=>e.stopPropagation()} style={{color:'var(--green)',textDecoration:'none'}}>📞 {s.phone}</a>}
                         </div>
@@ -1954,7 +2217,7 @@ function StoreDetailModal({store,tasks,assignments,hasAccount,onClose}){
               {receipts.map(r=>(
                 <div key={r.id} style={{display:'flex',alignItems:'center',gap:12,padding:'10px 0',borderBottom:'1px solid var(--border)'}}>
                   <span style={{flex:1,fontSize:13,fontWeight:600}}>{r.ops_announcements?.title||'(announcement)'}</span>
-                  <span style={{fontSize:11,fontWeight:700,color:r.confirmed?'var(--green)':'var(--muted)',background:r.confirmed?'rgba(95,184,122,.15)':'rgba(255,255,255,.05)',padding:'2px 8px',borderRadius:4}}>{r.confirmed?'✓ Confirmed':'Not confirmed'}</span>
+                  <span style={{fontSize:11,fontWeight:700,color:r.confirmed?'var(--green)':'var(--muted)',background:r.confirmed?'rgba(95,184,122,.15)':'#EFE9DB',padding:'2px 8px',borderRadius:4}}>{r.confirmed?'✓ Confirmed':'Not confirmed'}</span>
                 </div>
               ))}
             </div>
@@ -2087,21 +2350,27 @@ function HQWarnings({onUpdate}){
           const expired=new Date(w.issued_at)<oneYearAgo;
           const dl=deadlineInfo(w.deadline);
           return(
-            <div key={w.id} onClick={()=>setDetail(w)} style={{background:'var(--panel)',border:'1px solid var(--border)',borderLeft:`3px solid ${w.status==='rescinded'?'var(--muted2)':w.status==='submitted'?'var(--gold)':expired?'var(--border2)':'var(--red)'}`,borderRadius:10,padding:14,marginBottom:10,cursor:'pointer',opacity:w.status==='rescinded'||expired?0.65:1}}>
-              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:4,flexWrap:'wrap',gap:6}}>
-                <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
-                  <span style={{fontSize:11,fontWeight:700,background:'rgba(224,82,82,.15)',color:'var(--red)',padding:'2px 8px',borderRadius:999}}>{w.category}</span>
-                  <span style={{fontSize:14,fontWeight:700}}>{w.store_name}</span>
-                  {w.status==='submitted'&&<span style={{fontSize:10,color:'var(--gold)',fontWeight:700,textTransform:'uppercase'}}>● Submitted for review</span>}
-                  {w.status==='registered'&&<span style={{fontSize:10,color:'var(--red)',fontWeight:700,textTransform:'uppercase'}}>✓ Registered</span>}
-                  {w.status==='rescinded'&&<span style={{fontSize:10,color:'var(--muted)',fontWeight:700,textTransform:'uppercase'}}>Rescinded</span>}
-                  {expired&&w.status!=='rescinded'&&<span style={{fontSize:10,color:'var(--muted)',fontWeight:700,textTransform:'uppercase'}}>Expired (&gt;12mo)</span>}
-                  {dl&&w.status!=='rescinded'&&!expired&&<span style={{fontSize:10,fontWeight:700,color:dl.color,border:`1px solid ${dl.color}`,padding:'1px 7px',borderRadius:999}}>{dl.label}</span>}
-                </div>
-                <span style={{fontSize:11,color:'var(--muted)'}}>{new Date(w.issued_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}</span>
+            <div key={w.id} onClick={()=>setDetail(w)} className="task-card" style={{opacity:w.status==='rescinded'||expired?0.6:1,borderLeft:`3px solid ${w.status==='rescinded'?'var(--muted2)':w.status==='submitted'?'#CC9C3A':expired?'var(--border2)':'var(--red)'}`}}>
+              <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
+                <span className="badge badge-red" style={{flexShrink:0}}>{w.category}</span>
+                <span style={{minWidth:0,flex:1,display:'flex',flexDirection:'column',gap:1}}>
+                  <span style={{fontSize:14,fontWeight:800,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{w.store_name}</span>
+                  <span style={{fontSize:12,color:'var(--muted)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{w.reason}</span>
+                </span>
+                <span style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:3,flexShrink:0}}>
+                  <span style={{fontSize:11,color:'var(--muted2)'}}>{new Date(w.issued_at).toLocaleDateString('en-US',{month:'short',day:'numeric'})}</span>
+                  {w.status==='submitted'&&<span className="badge badge-gold">Review reply</span>}
+                  {w.status==='registered'&&!expired&&<span className="badge badge-red">Active</span>}
+                  {w.status==='rescinded'&&<span className="badge" style={{background:'var(--panel2)',color:'var(--muted)'}}>Rescinded</span>}
+                  {expired&&w.status!=='rescinded'&&<span className="badge" style={{background:'var(--panel2)',color:'var(--muted)'}}>Expired</span>}
+                </span>
               </div>
-              <div style={{fontSize:13,color:'var(--muted)',lineHeight:1.5}}>{w.reason.length>120?w.reason.slice(0,120)+'...':w.reason}</div>
-              {w.related_task_title&&<div style={{fontSize:11,color:'var(--muted2)',marginTop:4}}>Related task: {w.related_task_title}</div>}
+              {(dl&&w.status!=='rescinded'&&!expired)||w.related_task_title?(
+                <div style={{display:'flex',gap:12,marginTop:8,fontSize:11,color:'var(--muted2)',flexWrap:'wrap'}}>
+                  {dl&&w.status!=='rescinded'&&!expired&&<span style={{fontWeight:700,color:dl.color}}>{dl.label}</span>}
+                  {w.related_task_title&&<span>Related task: {w.related_task_title}</span>}
+                </div>
+              ):null}
             </div>
           );
         })}
@@ -2380,6 +2649,7 @@ function HQMessages({onBadgeRefresh}){
   const [loading,setLoading]=useState(true);
   const [filter,setFilter]=useState('all'); // all, open, replied
   const [topicFilter,setTopicFilter]=useState('all');
+  const [q,setQ]=useState('');
   const [selected,setSelected]=useState(null);
 
   async function load(){
@@ -2400,6 +2670,11 @@ function HQMessages({onBadgeRefresh}){
   }
 
   const filtered=messages.filter(m=>{
+    if(q.trim()){
+      const k=q.trim().toLowerCase();
+      const hay=((m.store_name||'')+' '+(m.subject||'')+' '+(m.body||'')+' '+(m.sender_name||'')).toLowerCase();
+      if(!hay.includes(k))return false;
+    }
     if(filter==='open'&&m.status!=='open')return false;
     if(filter==='replied'&&m.status!=='replied')return false;
     if(topicFilter!=='all'&&m.topic!==topicFilter)return false;
@@ -2415,34 +2690,47 @@ function HQMessages({onBadgeRefresh}){
         <button className="btn btn-primary" onClick={()=>setShowCompose(true)}>+ New Message</button>
       </div>
       <div className="content">
+        <input value={q} onChange={e=>setQ(e.target.value)} placeholder="Search store, subject, or message..."
+          style={{width:'100%',marginBottom:10,background:'var(--panel)',border:'1px solid var(--border2)',borderRadius:9,padding:'10px 14px',color:'var(--text)',fontFamily:'inherit',fontSize:13.5,outline:'none'}}/>
         <div style={{display:'flex',gap:8,marginBottom:14,flexWrap:'wrap'}}>
           {['all','open','replied'].map(f=>(
             <button key={f} className={`btn btn-sm ${filter===f?'btn-primary':'btn-ghost'}`} onClick={()=>setFilter(f)}>
               {f==='all'?'All':f==='open'?'Awaiting Reply':'Replied'}
             </button>
           ))}
-          <select value={topicFilter} onChange={e=>setTopicFilter(e.target.value)} style={{marginLeft:'auto',background:'var(--panel2)',border:'1px solid var(--border2)',borderRadius:8,padding:'7px 12px',color:'var(--text)',fontSize:13,fontFamily:'inherit',outline:'none'}}>
+          <select value={topicFilter} onChange={e=>setTopicFilter(e.target.value)} style={{marginLeft:'auto',background:'var(--panel)',border:'1px solid var(--border2)',borderRadius:8,padding:'7px 12px',color:'var(--text)',fontSize:13,fontFamily:'inherit',outline:'none'}}>
             <option value="all">All Topics</option>
             {MSG_TOPICS.map(t=><option key={t} value={t}>{t}</option>)}
           </select>
         </div>
         {loading?<div className="loading">Loading...</div>:filtered.length===0?(
           <div className="empty"><div className="empty-icon">✉</div><div className="empty-title">No messages</div></div>
-        ):filtered.map(m=>(
-          <div key={m.id} onClick={()=>openMessage(m)} style={{background:'var(--panel)',border:`1px solid ${!m.is_read?'var(--teal)':'var(--border)'}`,borderLeft:`3px solid ${TOPIC_COLORS[m.topic]||'#869490'}`,borderRadius:10,padding:16,marginBottom:10,cursor:'pointer',transition:'border-color .15s'}}>
-            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:6}}>
-              <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
-                {!m.is_read&&<span style={{width:8,height:8,borderRadius:'50%',background:'var(--teal)',flexShrink:0}}/>}
-                <span style={{fontSize:11,fontWeight:700,background:(TOPIC_COLORS[m.topic]||'#869490')+'22',color:TOPIC_COLORS[m.topic]||'#869490',padding:'2px 8px',borderRadius:999}}>{m.topic}</span>
-                <span style={{fontSize:14,fontWeight:700}}>{m.subject}</span>
-              </div>
-              <span style={{fontSize:11,color:m.status==='replied'?'var(--green)':'var(--gold)'}}>{m.status==='replied'?'✓ Replied':'Open'}</span>
+        ):(()=>{
+          const open=filtered.filter(m=>m.status==='open');
+          const rest=filtered.filter(m=>m.status!=='open');
+          const Row=(m)=>(
+            <div key={m.id} onClick={()=>openMessage(m)} style={{background:'var(--panel)',border:'1px solid var(--border)',borderLeft:`3px solid ${TOPIC_COLORS[m.topic]||'#9A937F'}`,borderRadius:12,padding:'13px 16px',marginBottom:8,cursor:'pointer',boxShadow:'var(--shadow)',display:'flex',alignItems:'center',gap:12}}>
+              <span style={{minWidth:0,flex:1,display:'flex',flexDirection:'column',gap:1}}>
+                <span style={{display:'flex',alignItems:'center',gap:7}}>
+                  {!m.is_read&&<span style={{width:8,height:8,borderRadius:'50%',background:'var(--gold-dim)',flexShrink:0}}/>}
+                  <span style={{fontSize:13.5,fontWeight:800,color:'var(--text)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{m.store_name}</span>
+                  <span style={{fontSize:10.5,fontWeight:700,background:(TOPIC_COLORS[m.topic]||'#9A937F')+'22',color:TOPIC_COLORS[m.topic]||'#9A937F',padding:'1px 7px',borderRadius:999,flexShrink:0}}>{m.topic}</span>
+                </span>
+                <span style={{fontSize:12.5,color:'var(--muted)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{m.subject}{m.body?<span style={{color:'var(--muted2)'}}> — {m.body}</span>:null}</span>
+              </span>
+              <span style={{flexShrink:0,textAlign:'right',display:'flex',flexDirection:'column',gap:3,alignItems:'flex-end'}}>
+                <span style={{fontSize:11,color:'var(--muted2)'}}>{new Date(m.created_at).toLocaleString('en-US',{month:'short',day:'numeric'})}</span>
+                {m.status==='replied'?<span className="badge badge-green">Replied</span>:<span className="badge badge-gold">Reply</span>}
+              </span>
             </div>
-            <div style={{fontSize:12,color:'var(--text)',fontWeight:600,marginBottom:2}}>{m.store_name}</div>
-            <div style={{fontSize:13,color:'var(--muted)',lineHeight:1.5,whiteSpace:'pre-wrap'}}>{m.body.length>140?m.body.slice(0,140)+'...':m.body}</div>
-            <div style={{fontSize:10,color:'var(--muted2)',marginTop:8}}>{new Date(m.created_at).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})}</div>
-          </div>
-        ))}
+          );
+          return(<>
+            {open.length>0&&<div style={{fontSize:11,fontWeight:800,color:'var(--gold-dim)',letterSpacing:'.08em',textTransform:'uppercase',margin:'4px 0 8px'}}>Needs reply · {open.length}</div>}
+            {open.map(Row)}
+            {rest.length>0&&<div style={{fontSize:11,fontWeight:800,color:'var(--muted2)',letterSpacing:'.08em',textTransform:'uppercase',margin:'16px 0 8px'}}>Replied</div>}
+            {rest.map(Row)}
+          </>);
+        })()}
       </div>
       {selected&&<HQMessageDetail message={selected} onClose={()=>{setSelected(null);load();}}/>}
       {showCompose&&<HQNewMessageModal onClose={()=>{setShowCompose(false);load();}}/>}
@@ -2667,7 +2955,7 @@ function HQNewMessageModal({onClose}){
   );
 }
 
-function HQReview(){
+function HQReview({focusId,onFocusDone}){
   const [submitted,setSubmitted]=useState([]);
   const [loading,setLoading]=useState(true);
   const [selected,setSelected]=useState(null);
@@ -2686,8 +2974,18 @@ function HQReview(){
     setSelected(a);
   }
 
-  async function approve(id){await sb.from('ops_assignments').update({status:'approved',reviewed_at:new Date().toISOString(),reviewed_by:'HQ'}).eq('id',id);setSelected(null);load();}
-  async function reject(id){const n=window.prompt('Rejection reason:');if(n===null)return;await sb.from('ops_assignments').update({status:'rejected',hq_notes:n,reviewed_at:new Date().toISOString(),reviewed_by:'HQ'}).eq('id',id);setSelected(null);load();}
+  const [rejecting,setRejecting]=useState(null); // assignment id awaiting a reason
+  const [undo,setUndo]=useState(null); // {id} recently approved
+  useEffect(()=>{
+    if(loading||!focusId)return;
+    const hit=submitted.find(x=>x.id===focusId);
+    if(hit){openDetail(hit);}
+    if(onFocusDone)onFocusDone();
+  },[loading]);
+  async function approve(id){await sb.from('ops_assignments').update({status:'approved',reviewed_at:new Date().toISOString(),reviewed_by:'HQ'}).eq('id',id);setSelected(null);setUndo({id});setTimeout(()=>setUndo(u=>u&&u.id===id?null:u),6000);load();}
+  async function undoApprove(id){await sb.from('ops_assignments').update({status:'submitted',reviewed_at:null,reviewed_by:null}).eq('id',id);setUndo(null);load();}
+  function reject(id){setRejecting(id);}
+  async function sendReject(id,reason){await sb.from('ops_assignments').update({status:'rejected',hq_notes:reason,reviewed_at:new Date().toISOString(),reviewed_by:'HQ'}).eq('id',id);setRejecting(null);setSelected(null);load();}
 
   return(
     <>
@@ -2699,30 +2997,56 @@ function HQReview(){
           <div className="empty"><div className="empty-icon">◎</div><div className="empty-title">All caught up</div><div style={{fontSize:13,color:'var(--muted)'}}>No submissions pending review</div></div>
         ):(
           submitted.map(a=>(
-            <div key={a.id} onClick={()=>openDetail(a)} style={{background:'var(--panel)',border:'1px solid rgba(204,156,58,.3)',borderRadius:12,padding:18,marginBottom:12,cursor:'pointer',transition:'border-color .15s'}}
-              onMouseEnter={e=>e.currentTarget.style.borderColor='var(--gold)'}
-              onMouseLeave={e=>e.currentTarget.style.borderColor='rgba(204,156,58,.3)'}>
-              <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between'}}>
-                <div>
-                  <div style={{display:'flex',gap:8,alignItems:'center',marginBottom:6}}>
-                    <span className={`cat-badge cat-${a.ops_tasks?.category}`}>{catLabel(a.ops_tasks?.category)}</span>
-                    <span style={{fontSize:15,fontWeight:700}}>{a.ops_tasks?.title}</span>
-                  </div>
-                  <div style={{fontSize:13,color:'var(--text)',fontWeight:600}}>{a.franchisees?.name}</div>
-                  <div style={{fontSize:11,color:'var(--muted)',marginTop:2}}>{a.franchisees?.territory} · {a.franchisees?.email}</div>
-                  <div style={{fontSize:11,color:'var(--gold)',marginTop:4}}>Click to review submitted proof →</div>
-                </div>
-                <div style={{display:'flex',gap:8}} onClick={e=>e.stopPropagation()}>
-                  <button className="btn btn-danger btn-sm" onClick={()=>reject(a.id)}>Reject</button>
-                  <button className="btn btn-green btn-sm" onClick={()=>approve(a.id)}>Approve ✓</button>
-                </div>
-              </div>
+            <div key={a.id} onClick={()=>openDetail(a)} className="task-card" style={{display:'flex',alignItems:'center',gap:12,flexWrap:'wrap'}}>
+              <span className={`cat-badge cat-${a.ops_tasks?.category}`} style={{flexShrink:0}}>{catLabel(a.ops_tasks?.category)}</span>
+              <span style={{minWidth:0,flex:1,display:'flex',flexDirection:'column',gap:1}}>
+                <span style={{fontSize:13.5,fontWeight:800,color:'var(--text)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{a.franchisees?.name}</span>
+                <span style={{fontSize:12.5,color:'var(--muted)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{a.ops_tasks?.title}</span>
+              </span>
+              <span style={{fontSize:11,color:'var(--muted2)',flexShrink:0}}>{a.updated_at?new Date(a.updated_at).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}):''}</span>
+              <span style={{display:'flex',gap:8,flexShrink:0}} onClick={e=>e.stopPropagation()}>
+                <button className="btn btn-ghost btn-sm" onClick={()=>reject(a.id)}>Needs changes</button>
+                <button className="btn btn-primary btn-sm" onClick={()=>approve(a.id)}>Approve ✓</button>
+              </span>
             </div>
           ))
         )}
       </div>
       {selected&&<AssignmentDetailModal assignment={selected} subtasks={selectedSubtasks} onClose={()=>setSelected(null)} onApprove={()=>approve(selected.id)} onReject={()=>reject(selected.id)}/>}
+      {rejecting&&<RejectReasonModal onCancel={()=>setRejecting(null)} onSend={(reason)=>sendReject(rejecting,reason)}/>}
+      {undo&&(
+        <div style={{position:'fixed',left:'50%',transform:'translateX(-50%)',bottom:'calc(84px + env(safe-area-inset-bottom))',background:'var(--ink)',color:'#F0EDE8',borderRadius:12,padding:'11px 16px',display:'flex',alignItems:'center',gap:14,zIndex:70,boxShadow:'0 8px 24px rgba(0,0,0,.3)',fontSize:13,fontWeight:600}}>
+          ✓ Approved
+          <button onClick={()=>undoApprove(undo.id)} style={{background:'none',border:'none',color:'var(--ink-gold)',fontFamily:'inherit',fontSize:13,fontWeight:800,cursor:'pointer',padding:0}}>Undo</button>
+        </div>
+      )}
     </>
+  );
+}
+
+// Reason picker for "Needs changes" (writes the same hq_notes field as before)
+function RejectReasonModal({onCancel,onSend}){
+  const COMMON=['Photo is unclear, please retake','A step is missing, please complete all steps','Wrong photo uploaded','Please add a short note describing what was done'];
+  const [text,setText]=useState('');
+  return(
+    <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&onCancel()}>
+      <div className="modal" style={{maxWidth:460}}>
+        <div className="modal-header"><div className="modal-title">What needs to change?</div><button className="close-btn" onClick={onCancel}>×</button></div>
+        <div className="modal-body">
+          <div style={{display:'flex',flexDirection:'column',gap:8,marginBottom:14}}>
+            {COMMON.map(r=>(
+              <button key={r} className="btn btn-ghost" style={{justifyContent:'flex-start',textAlign:'left',fontWeight:500,borderColor:text===r?'var(--gold-dim)':'var(--border2)',color:text===r?'var(--text)':'var(--muted)'}} onClick={()=>setText(r)}>{r}</button>
+            ))}
+          </div>
+          <textarea value={text} onChange={e=>setText(e.target.value)} placeholder="Or write your own note to the store..." rows={3}
+            style={{width:'100%',background:'var(--panel2)',border:'1px solid var(--border2)',borderRadius:9,padding:'10px 12px',color:'var(--text)',fontFamily:'inherit',fontSize:13,outline:'none',resize:'vertical'}}/>
+        </div>
+        <div className="modal-footer">
+          <button className="btn btn-ghost" onClick={onCancel}>Cancel</button>
+          <button className="btn btn-primary" disabled={!text.trim()} onClick={()=>onSend(text.trim())}>Send back to store</button>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -2868,6 +3192,13 @@ function AccountManager({onBadgeRefresh}){
     return <span onClick={e=>{e.stopPropagation();const r=e.currentTarget.getBoundingClientRect();const above=r.bottom>window.innerHeight*0.55;setPop({text:s,x:Math.max(8,Math.min(r.left,window.innerWidth-228)),y:above?r.top-6:r.bottom+6,above});}}
       style={{...base,cursor:'pointer',borderBottom:'1px dotted var(--muted2)',whiteSpace:'nowrap'}}>{s.slice(0,12)}…</span>;
   }
+  function Ava({name}){
+    const n=(name||'?').trim();
+    const parts=n.split(/\s+/);
+    const ini=(parts[0][0]+(parts[1]?parts[1][0]:'')).toUpperCase();
+    let h=0;for(let i=0;i<n.length;i++)h=(h*31+n.charCodeAt(i))>>>0;
+    return <span className={`pava pava-${h%4}`}>{ini}</span>;
+  }
 
   return(
     <>
@@ -2935,16 +3266,16 @@ function AccountManager({onBadgeRefresh}){
                 {filtered.length===0&&<tr><td colSpan={5}><div className="empty"><div className="empty-title">No accounts found</div></div></td></tr>}
                 {filtered.map(m=>(
                   <tr key={m.id}>
-                    <td>{cellTrunc(m.full_name||m.name,{bold:true})}</td>
-                    <td>{cellTrunc(m.store,{muted:true})}</td>
-                    <td>
+                    <td data-label="Name"><span className="pcell"><Ava name={m.full_name||m.name}/>{cellTrunc(m.full_name||m.name,{bold:true})}</span></td>
+                    <td data-label="Store">{cellTrunc(m.store,{muted:true})}</td>
+                    <td data-label="Role">
                       <div style={{display:'flex',flexDirection:'column',gap:3}}>
-                        {m.title&&<span style={{fontSize:11,background:'rgba(95,184,122,.15)',color:'#5FB87A',padding:'2px 8px',borderRadius:4,fontWeight:700,whiteSpace:'nowrap'}}>{m.title}</span>}
+                        {m.title&&<span style={{fontSize:11,background:'#E8F4EC',color:'var(--green)',padding:'2px 8px',borderRadius:4,fontWeight:700,whiteSpace:'nowrap'}}>{m.title}</span>}
                         <span style={{fontSize:10,color:'var(--muted)'}}>{m.role==='hq'?'HQ':'Franchisee'}</span>
                       </div>
                     </td>
-                    <td><span className={`badge ${m.is_active!==false?'badge-green':'badge-red'}`}>{m.is_active!==false?'Active':'Inactive'}</span></td>
-                    <td>
+                    <td data-label="Status"><span className={`badge ${m.is_active!==false?'badge-green':'badge-red'}`}>{m.is_active!==false?'Active':'Inactive'}</span></td>
+                    <td data-label="Action">
                       <div style={{display:'flex',gap:6,alignItems:'center'}}>
                         <button className="btn btn-ghost btn-sm" onClick={()=>setEditMember(m)}>Edit</button>
                         {m.role==='franchisee'&&<button className="btn btn-ghost btn-sm" onClick={()=>sendPasswordReset(m)}>Reset PW</button>}
@@ -3337,7 +3668,7 @@ function AnnouncementCard({ann,stores,catColor,catLabel,onRefresh}){
       <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',marginBottom:8}}>
         <div style={{display:'flex',gap:8,alignItems:'center'}}>
           <span style={{fontSize:11,fontWeight:700,background:color+'22',color,padding:'2px 8px',borderRadius:999,textTransform:'uppercase'}}>{catLabel(ann.category)}</span>
-          {ann.status==='archived'&&<span style={{fontSize:10,color:'var(--muted)',background:'rgba(255,255,255,.05)',padding:'2px 6px',borderRadius:4}}>ARCHIVED</span>}
+          {ann.status==='archived'&&<span style={{fontSize:10,color:'var(--muted)',background:'#EFE9DB',padding:'2px 6px',borderRadius:4}}>ARCHIVED</span>}
         </div>
         <div style={{display:'flex',gap:8,alignItems:'center'}}>
           <span style={{fontSize:11,color:'var(--muted)'}}>{new Date(ann.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}</span>
@@ -3389,7 +3720,7 @@ function AnnouncementCard({ann,stores,catColor,catLabel,onRefresh}){
           </div>
           <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
             {receipts.map(r=>(
-              <span key={r.id} style={{fontSize:11,padding:'2px 8px',borderRadius:4,background:r.confirmed?'rgba(95,184,122,.15)':'rgba(255,255,255,.05)',color:r.confirmed?'var(--green)':'var(--muted)'}}>
+              <span key={r.id} style={{fontSize:11,padding:'2px 8px',borderRadius:4,background:r.confirmed?'rgba(95,184,122,.15)':'#EFE9DB',color:r.confirmed?'var(--green)':'var(--muted)'}}>
                 {r.franchisees?.store_name||r.franchisees?.name||'?'} {r.confirmed?'✓':'○'}
               </span>
             ))}
@@ -3515,7 +3846,7 @@ function ChangePassword({onDone}){
 
 // ── FRANCHISEE PORTAL ────────────────────────────────────
 function FranchiseePortal({session, profile}){
-  const [portalView,setPortalView]=useState(()=>location.hash==='#install'?'password':'tasks');
+  const [portalView,setPortalView]=useState(()=>window.location.hash==='#install'?'password':'tasks');
   const [botOpen,setBotOpen]=useState(false);
   const [hqReplyCount,setHqReplyCount]=useState(0);
   const [taskCount,setTaskCount]=useState(0);
@@ -3586,10 +3917,10 @@ function FranchiseePortal({session, profile}){
           <img src="data:image/png;base64,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" style={{width:72,height:72,borderRadius:'50%',marginBottom:8,display:'block'}} alt="Ugly Donuts & Corn Dogs"/>
           <div style={{fontSize:10,color:'var(--orange)',letterSpacing:'.1em',textTransform:'uppercase',fontWeight:700}}>Franchisee Portal</div>
         </div>
-        <nav className="nav">
+        <nav className="nav portal-nav">
           {navItems.map(n=>(
-            <button key={n.key} className={`nav-item ${portalView===n.key?'active':''}`} onClick={()=>n.key==='bot'?setBotOpen(true):setPortalView(n.key)}>
-              <span className="nav-icon" style={{fontSize:15,width:20,textAlign:'center'}}>{n.icon}</span>{n.label}
+            <button key={n.key} data-navkey={n.key} className={`nav-item ${portalView===n.key?'active':''}`} onClick={()=>n.key==='bot'?setBotOpen(true):setPortalView(n.key)}>
+              <span className="nav-icon" style={{width:20,display:'inline-flex',justifyContent:'center'}}><NavIcon k={n.key}/></span>{n.label}
               {n.badge?<span className="nav-badge">{n.badge}</span>:null}
             </button>
           ))}
@@ -3605,12 +3936,34 @@ function FranchiseePortal({session, profile}){
           <div style={{fontSize:11,fontWeight:700,color:'var(--orange)',letterSpacing:'.12em',textTransform:'uppercase'}}>Franchisee Portal</div>
           <div style={{fontSize:12,color:'var(--muted)',marginTop:2}}>{storeName}</div>
         </div>
+        {portalView==='tasks'&&warningCount>0&&(
+          <div onClick={()=>setPortalView('warnings')} style={{margin:'14px 16px 0',background:'#F9E9E7',border:'1px solid rgba(190,74,62,.35)',borderRadius:12,padding:'12px 14px',display:'flex',alignItems:'center',gap:10,cursor:'pointer'}}>
+            <span style={{fontSize:16}}>⚠️</span>
+            <span style={{flex:1,fontSize:13,fontWeight:700,color:'var(--red)'}}>You have {activeWarningCount||warningCount} active warning{(activeWarningCount||warningCount)>1?'s':''} — tap to view and respond</span>
+            <span style={{fontSize:14,color:'var(--red)'}}>→</span>
+          </div>
+        )}
         {portalView==='tasks'&&<FranchiseeTasks profile={profile} onUpdate={refreshBadges}/>}
         {portalView==='announce'&&<FranchiseeAnnouncements profile={profile} onUpdate={refreshBadges}/>}
         {portalView==='contact'&&<ContactHQ profile={profile} storeName={storeName} onSeen={refreshBadges}/>}
         {portalView==='warnings'&&warningCount>0&&<FranchiseeWarnings profile={profile} storeName={storeName} onUpdate={refreshBadges}/>}
         {portalView==='password'&&<><ChangePassword onDone={()=>setPortalView('tasks')}/><PwaCards profile={profile}/></>}
       </main>
+      <nav className="tabbar">
+        {[
+          {v:'tasks',label:'Tasks',badge:taskCount||null,icon:<><path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1.5"/><circle cx="4.5" cy="12" r="1.5"/><circle cx="4.5" cy="18" r="1.5"/></>},
+          {v:'announce',label:'Updates',badge:announceCount||null,icon:<><path d="M3 11l18-7-4 16-6-4-3 4-1-6z"/></>},
+          {v:'contact',label:'Inbox',badge:hqReplyCount||null,icon:<><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></>},
+          {v:'bot',label:'UglyBot',icon:<><circle cx="12" cy="12" r="9"/><circle cx="9" cy="10" r="1.3"/><circle cx="15" cy="10" r="1.3"/><path d="M8.5 14.5c1 1.2 2.2 1.8 3.5 1.8s2.5-.6 3.5-1.8"/></>},
+          {v:'password',label:'Me',badge:activeWarningCount||null,icon:<><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a7 7 0 0 1 14 0v1"/></>},
+        ].map(t=>(
+          <button key={t.v} className={`tb ${portalView===t.v?'on':''}`} onClick={()=>{if(t.v==='bot'){setBotOpen(true);}else{setPortalView(t.v);}window.scrollTo(0,0);}}>
+            <svg fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">{t.icon}</svg>
+            {t.label}
+            {t.badge?<span className="tbadge">{t.badge}</span>:null}
+          </button>
+        ))}
+      </nav>
       {botOpen&&<UglyBotModal onClose={()=>setBotOpen(false)}/>}
     </div>
   );
@@ -4048,36 +4401,40 @@ function FranchiseeTasks({profile,onUpdate}){
         ):assignments.length===0?(
           <div className="empty"><div className="empty-icon">▤</div><div className="empty-title">No tasks yet</div><div style={{fontSize:13,color:'var(--muted)'}}>HQ will assign tasks here</div></div>
         ):(
-          assignments.map(a=>(
-            <div key={a.id} style={{background:'var(--panel)',border:`1px solid ${a.status==='rejected'?'rgba(224,82,82,.3)':'var(--border)'}`,borderRadius:12,padding:18,marginBottom:12,cursor:'pointer',transition:'border-color .2s'}}
-              onClick={()=>setSelected(a)}
-              onMouseEnter={e=>e.currentTarget.style.borderColor='var(--orange)'}
-              onMouseLeave={e=>e.currentTarget.style.borderColor=a.status==='rejected'?'rgba(224,82,82,.3)':'var(--border)'}>
-              <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',marginBottom:8}}>
-                <div style={{display:'flex',gap:8,alignItems:'center'}}>
-                  <span className={`cat-badge cat-${a.ops_tasks?.category}`}>{catLabel(a.ops_tasks?.category)}</span>
-                  <span style={{fontSize:15,fontWeight:700}}>{a.ops_tasks?.title}</span>
-                </div>
-                <span style={{fontSize:12,fontWeight:700,color:statusColors[a.status],background:statusColors[a.status]+'22',padding:'2px 10px',borderRadius:999,whiteSpace:'nowrap'}}>
+          assignments.map(a=>{
+            const days=a.ops_tasks?.due_date?daysUntil(a.ops_tasks.due_date):null;
+            const nSub=(subtasksMap[a.id]||[]).length;
+            const nDone=(completionsMap[a.id]||[]).filter(c=>c.completed).length;
+            return(
+            <div key={a.id} className="task-card" style={a.status==='rejected'?{borderColor:'rgba(190,74,62,.35)'}:null} onClick={()=>setSelected(a)}>
+              <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:6,flexWrap:'wrap'}}>
+                <span className={`cat-badge cat-${a.ops_tasks?.category}`}>{catLabel(a.ops_tasks?.category)}</span>
+                <span style={{marginLeft:'auto'}}/>
+                {days!==null&&days<=3&&<span style={{fontSize:11.5,fontWeight:800,color:days<0?'var(--red)':'var(--gold-dim)',whiteSpace:'nowrap'}}>{days<0?`${Math.abs(days)}d overdue`:days===0?'Due today':`${days}d left`}</span>}
+                <span style={{fontSize:11.5,fontWeight:700,color:statusColors[a.status],background:statusColors[a.status]+'22',padding:'2px 10px',borderRadius:999,whiteSpace:'nowrap'}}>
                   {STATUS_LABELS[a.status]||a.status}
                 </span>
               </div>
-              {a.ops_tasks?.description&&<div style={{fontSize:13,color:'var(--muted)',marginBottom:8}}>{a.ops_tasks.description}</div>}
-              {a.ops_tasks?.due_date&&<div style={{fontSize:12,color:daysUntil(a.ops_tasks.due_date)<0?'var(--red)':daysUntil(a.ops_tasks.due_date)<=3?'var(--orange)':'var(--muted)'}}>
-                Due: {fmtDate(a.ops_tasks.due_date)} {daysUntil(a.ops_tasks.due_date)<0&&'· OVERDUE'}
-              </div>}
+              <div className="task-card-title">{a.ops_tasks?.title}</div>
+              <div style={{fontSize:12,color:'var(--muted)',display:'flex',gap:12,flexWrap:'wrap'}}>
+                {a.ops_tasks?.due_date&&<span style={{fontWeight:600}}>Due {fmtDate(a.ops_tasks.due_date)}</span>}
+                {a.ops_tasks?.description&&<span style={{overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',maxWidth:'60%'}}>{a.ops_tasks.description}</span>}
+              </div>
               {a.status==='rejected'&&a.hq_notes&&(
-                <div style={{marginTop:8,padding:10,background:'rgba(224,82,82,.08)',border:'1px solid rgba(224,82,82,.2)',borderRadius:6,fontSize:12,color:'var(--red)'}}>
-                  HQ Feedback: {a.hq_notes}
+                <div style={{marginTop:10,padding:'10px 12px',background:'#F9E9E7',border:'1px solid rgba(190,74,62,.25)',borderRadius:9,fontSize:12.5,color:'var(--red)',fontWeight:600}}>
+                  HQ: {a.hq_notes}
                 </div>
               )}
-              {(subtasksMap[a.id]||[]).length>0&&(
-                <div style={{marginTop:8,fontSize:12,color:'var(--muted)'}}>
-                  {(completionsMap[a.id]||[]).filter(c=>c.completed).length}/{(subtasksMap[a.id]||[]).length} sub-tasks complete
+              {nSub>0&&(
+                <div style={{display:'flex',alignItems:'center',gap:12,marginTop:10}}>
+                  <div className="progress-bar" style={{flex:1}}>
+                    <div className="progress-fill" style={{width:`${nDone/nSub*100}%`,background:nDone===nSub?'var(--green)':'linear-gradient(90deg,#CC9C3A,#E3BE64)'}}/>
+                  </div>
+                  <span style={{fontSize:12.5,fontWeight:800,fontVariantNumeric:'tabular-nums',color:nDone===nSub?'var(--green)':'var(--text)'}}>{nDone}<span style={{color:'var(--muted2)',fontWeight:600}}>/{nSub}</span></span>
                 </div>
               )}
             </div>
-          ))
+          );})
         )}
       </div>
       {selected&&<FranchiseeTaskModal assignment={selected} subtasks={subtasksMap[selected.id]||[]} completions={completionsMap[selected.id]||[]} onClose={()=>{setSelected(null);load();if(onUpdate)onUpdate();}}/>}
@@ -4485,6 +4842,15 @@ function UglyBotModal({onClose}){
 })();
 
 ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+<script>
+/* Pull-to-refresh for installed PWA (mobile touch only). Keeps current screen via #open= hash. */
+(function(){var sy=0,pull=0,active=false,el=null;
+function ind(){el=document.createElement('div');el.id='ptr-ind';el.style.cssText='position:fixed;top:-46px;left:50%;transform:translateX(-50%);z-index:9998;background:#14201E;color:#F0D68A;font:700 12px Inter,sans-serif;padding:9px 16px;border-radius:999px;transition:top .12s;box-shadow:0 4px 14px rgba(0,0,0,.25);pointer-events:none;';el.textContent='\u2193 Pull to refresh';document.body.appendChild(el);}
+document.addEventListener('touchstart',function(e){if((window.scrollY||0)<=0&&!document.querySelector('.modal-overlay,.more-sheet-backdrop')){sy=e.touches[0].clientY;active=true;pull=0;}},{passive:true});
+document.addEventListener('touchmove',function(e){if(!active)return;pull=e.touches[0].clientY-sy;if(pull>18){if(!el)ind();var p=Math.min(pull,120);el.style.top=(p*0.45-38)+'px';el.textContent=p>=100?'\u21bb Release to refresh':'\u2193 Pull to refresh';}},{passive:true});
+document.addEventListener('touchend',function(){if(active&&pull>=100){if(el){el.textContent='Refreshing\u2026';el.style.top='10px';}setTimeout(function(){location.reload();},120);}else if(el){el.style.top='-46px';}active=false;pull=0;},{passive:true});
+})();
 </script>
 </body>
 </html>
