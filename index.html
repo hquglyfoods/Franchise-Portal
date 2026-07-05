@@ -4,6 +4,24 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Ugly Donuts — Franchise Ops</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="theme-color" content="#0A1413">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Franchise">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<script>
+// PWA: register service worker (no caching inside; push + badge only)
+if ('serviceWorker' in navigator) { navigator.serviceWorker.register('/sw.js').catch(function(){}); }
+// PWA: intercept the install prompt so we can offer our own Install button
+window._pwaPrompt = null;
+window.addEventListener('beforeinstallprompt', function(e){
+  e.preventDefault(); window._pwaPrompt = e;
+  window.dispatchEvent(new CustomEvent('pwa-ready'));
+});
+window.addEventListener('appinstalled', function(){ window._pwaPrompt = null; window.dispatchEvent(new CustomEvent('pwa-ready')); });
+</script>
 <script src="https://unpkg.com/react@18.3.1/umd/react.production.min.js"></script>
 <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
 <script src="https://unpkg.com/@babel/standalone@7.26.4/babel.min.js"></script>
@@ -248,6 +266,105 @@ async function authFetch(url, opts={}){
   return fetch(url, Object.assign({}, opts, {headers}));
 }
 
+// ── PWA: push + badge helpers ─────────────────────────────
+const VAPID_PUBLIC='BJQDQGS170xaZiTZ4F9MY0T6ARodRW6Jv2RIi-XJO9jGxz6CwteRBkSoFSBFL7kS99fkQffGst4ZuuSxyee9Jpc';
+function b64ToU8(b64){const p='='.repeat((4-b64.length%4)%4);const s=(b64+p).replace(/-/g,'+').replace(/_/g,'/');const r=atob(s);const a=new Uint8Array(r.length);for(let i=0;i<r.length;i++)a[i]=r.charCodeAt(i);return a;}
+const isStandalone=()=>window.matchMedia('(display-mode: standalone)').matches||window.navigator.standalone===true;
+const isIOS=()=>/iphone|ipad|ipod/i.test(navigator.userAgent);
+
+// App icon badge (Android/desktop; iOS 16.4+ installed PWAs). Fails silently if unsupported.
+function setAppBadgeCount(n){
+  try{
+    if(!navigator.setAppBadge)return;
+    if(n>0)navigator.setAppBadge(n);else navigator.clearAppBadge();
+  }catch(e){}
+}
+
+// Install + Notifications cards (shown on the Settings page for both roles)
+function PwaCards({profile}){
+  const[,force]=React.useReducer(x=>x+1,0);
+  const[perm,setPerm]=React.useState(typeof Notification!=='undefined'?Notification.permission:'unsupported');
+  const[subOn,setSubOn]=React.useState(null);
+  const[busy,setBusy]=React.useState(false);
+  const[msg,setMsg]=React.useState('');
+  const[iosGuide,setIosGuide]=React.useState(false);
+  const[linkCopied,setLinkCopied]=React.useState(false);
+  React.useEffect(()=>{const f=()=>force();window.addEventListener('pwa-ready',f);return()=>window.removeEventListener('pwa-ready',f);},[]);
+  React.useEffect(()=>{(async()=>{
+    if(!('serviceWorker'in navigator)||typeof Notification==='undefined'){setSubOn(false);return;}
+    try{const reg=await navigator.serviceWorker.ready;const s=await reg.pushManager.getSubscription();setSubOn(!!s);}catch(e){setSubOn(false);}
+  })();},[]);
+  async function enable(){
+    setBusy(true);setMsg('');
+    try{
+      const p=await Notification.requestPermission();setPerm(p);
+      if(p!=='granted'){setMsg('Permission was not granted. Enable notifications for this app in your device settings.');setBusy(false);return;}
+      const reg=await navigator.serviceWorker.ready;
+      const sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:b64ToU8(VAPID_PUBLIC)});
+      let frId=null;
+      if(profile.role!=='hq'){try{frId=await resolveFranchiseeId(profile);}catch(e){}}
+      const row={endpoint:sub.endpoint,subscription:sub.toJSON(),user_id:profile.id,role:profile.role||null,franchisee_id:frId};
+      const{error}=await sb.from('push_subscriptions').upsert([row],{onConflict:'endpoint'});
+      if(error){setMsg('Could not save: '+error.message);}else{setSubOn(true);setMsg('Notifications are on for this device.');}
+    }catch(e){setMsg('Could not enable: '+(e.message||e));}
+    setBusy(false);
+  }
+  async function disable(){
+    setBusy(true);setMsg('');
+    try{
+      const reg=await navigator.serviceWorker.ready;const s=await reg.pushManager.getSubscription();
+      if(s){await sb.from('push_subscriptions').delete().eq('endpoint',s.endpoint);await s.unsubscribe();}
+      setSubOn(false);setMsg('Notifications are off for this device.');
+    }catch(e){setMsg('Could not disable: '+(e.message||e));}
+    setBusy(false);
+  }
+  const iosBlocked=isIOS()&&!isStandalone();
+  return(
+    <div style={{maxWidth:560,margin:'18px auto 0',display:'flex',flexDirection:'column',gap:12}}>
+      <div className="card" style={{padding:16}}>
+        <div style={{fontWeight:600,marginBottom:6}}>Install as an app</div>
+        {isStandalone()
+          ?<div style={{fontSize:13,color:'var(--green)'}}>✓ You are using the installed app.</div>
+          :window._pwaPrompt
+            ?<button className="btn btn-gold" disabled={busy} onClick={async()=>{try{window._pwaPrompt.prompt();await window._pwaPrompt.userChoice;}catch(e){}force();}}>Install</button>
+            :isIOS()
+              ?<div>
+                <button className="btn btn-gold" onClick={()=>setIosGuide(g=>!g)}>{iosGuide?'Hide instructions':'Install on iPhone/iPad'}</button>
+                {iosGuide&&(
+                  <div style={{marginTop:12,fontSize:13,color:'var(--muted)',lineHeight:1.7}}>
+                    <div>Apple only allows installing from Safari's Share menu, so it takes three taps:</div>
+                    <div style={{marginTop:8,color:'var(--text)'}}>1. Open this page in <b>Safari</b></div>
+                    <div style={{color:'var(--text)'}}>2. Tap <b>Share</b> <span style={{display:'inline-block',border:'1px solid var(--border2)',borderRadius:4,padding:'0 6px',fontSize:12}}>⬆︎</span> at the bottom</div>
+                    <div style={{color:'var(--text)'}}>3. Tap <b>"Add to Home Screen"</b>, then open it from your Home Screen</div>
+                    <button className="btn btn-ghost btn-sm" style={{marginTop:10}} onClick={async()=>{
+                      const link='https://uglyops.netlify.app/#install';
+                      try{await navigator.clipboard.writeText(link);}catch(e){const t=document.createElement('textarea');t.value=link;document.body.appendChild(t);t.select();try{document.execCommand('copy');}catch(e2){}document.body.removeChild(t);}
+                      setLinkCopied(true);setTimeout(()=>setLinkCopied(false),2000);
+                    }}>{linkCopied?'✓ Copied':'Copy link to open in Safari'}</button>
+                    <div style={{marginTop:6,fontSize:11,color:'var(--muted2)'}}>Not in Safari right now? Copy the link above, open Safari, and paste it.</div>
+                  </div>
+                )}
+              </div>
+              :<div style={{fontSize:13,color:'var(--muted)'}}>Open this site in Chrome (Android or desktop) to see the install option.</div>}
+      </div>
+      <div className="card" style={{padding:16}}>
+        <div style={{fontWeight:600,marginBottom:6}}>Notifications</div>
+        {typeof Notification==='undefined'||!('serviceWorker'in navigator)
+          ?<div style={{fontSize:13,color:'var(--muted)'}}>This browser does not support push notifications.</div>
+          :iosBlocked
+            ?<div style={{fontSize:13,color:'var(--muted)'}}>On iPhone/iPad, first install the app to your Home Screen (card above), then open it and enable notifications here.</div>
+            :perm==='denied'
+              ?<div style={{fontSize:13,color:'var(--muted)'}}>Notifications are blocked for this app. Allow them in your device/browser settings, then come back.</div>
+              :subOn
+                ?<button className="btn btn-ghost" disabled={busy} onClick={disable}>Turn off on this device</button>
+                :<button className="btn btn-gold" disabled={busy} onClick={enable}>Enable notifications</button>}
+        {msg&&<div style={{fontSize:12,color:'var(--muted)',marginTop:8}}>{msg}</div>}
+        <div style={{fontSize:11,color:'var(--muted2)',marginTop:8}}>You will get alerts for new tasks, announcements, replies and warnings even when the app is closed. Enable on each device you use.</div>
+      </div>
+    </div>
+  );
+}
+
 async function sendEmail(to, subject, html){
   try{
     const res = await authFetch(EMAIL_FN, {
@@ -483,6 +600,54 @@ function ResetPasswordScreen({onDone}){
   );
 }
 
+// Login-screen banner: lets first-time visitors know the portal installs as an app.
+// Not a popup: sits under the login card. Opening the site with #install
+// (the link HQ copies when approving an account) auto-expands the how-to.
+function InstallBanner(){
+  const deepLink=typeof location!=='undefined'&&location.hash==='#install';
+  const [hidden,setHidden]=React.useState(()=>{try{return !deepLink&&localStorage.getItem('installBannerDismissed')==='1';}catch(e){return false;}});
+  const [open,setOpen]=React.useState(deepLink);
+  const [,force]=React.useReducer(x=>x+1,0);
+  React.useEffect(()=>{const f=()=>force();window.addEventListener('pwa-ready',f);return()=>window.removeEventListener('pwa-ready',f);},[]);
+  if(isStandalone()||hidden)return null;
+  const dismiss=()=>{setHidden(true);try{localStorage.setItem('installBannerDismissed','1');}catch(e){}};
+  return(
+    <div style={{maxWidth:380,width:'100%',margin:'14px auto 0',background:'var(--panel)',border:'1px solid var(--border)',borderRadius:12,padding:'12px 14px',fontSize:13,color:'var(--muted)'}}>
+      <div style={{display:'flex',alignItems:'center',gap:10}}>
+        <span style={{fontSize:18}}>📲</span>
+        <div style={{flex:1,color:'var(--text)'}}>You can install this portal as an app on your phone.</div>
+        {window._pwaPrompt
+          ?<button className="btn btn-gold btn-sm" onClick={async()=>{try{window._pwaPrompt.prompt();await window._pwaPrompt.userChoice;}catch(e){}force();}}>Install</button>
+          :<button className="btn btn-ghost btn-sm" onClick={()=>setOpen(o=>!o)}>{open?'Hide':'How?'}</button>}
+        {!deepLink&&<button onClick={dismiss} aria-label="Dismiss" style={{background:'none',border:'none',color:'var(--muted2)',cursor:'pointer',fontSize:15,padding:'0 2px'}}>✕</button>}
+      </div>
+      {open&&(
+        <div style={{marginTop:10,paddingTop:10,borderTop:'1px solid var(--border)',lineHeight:1.6}}>
+          <div style={{color:'var(--text)',fontWeight:600,marginBottom:2}}>iPhone / iPad</div>
+          <div>Open this page in Safari → tap Share <span style={{color:'var(--text)'}}>(the square with ⬆︎)</span> → "Add to Home Screen" → open it from your Home Screen.</div>
+          <div style={{color:'var(--text)',fontWeight:600,margin:'8px 0 2px'}}>Android</div>
+          <div>Open this page in Chrome → tap the Install prompt, or menu (⋮) → "Install app".</div>
+          <div style={{marginTop:8,color:'var(--muted2)',fontSize:12}}>After installing, sign in and turn on notifications in Settings to get task and announcement alerts.</div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+// Copies the mobile install deep-link (login screen auto-opens the install guide).
+function CopyInstallLinkBtn(){
+  const [ok,setOk]=React.useState(false);
+  const link='https://uglyops.netlify.app/#install';
+  async function copy(){
+    try{await navigator.clipboard.writeText(link);}catch(e){
+      const t=document.createElement('textarea');t.value=link;document.body.appendChild(t);t.select();try{document.execCommand('copy');}catch(e2){}document.body.removeChild(t);
+    }
+    setOk(true);setTimeout(()=>setOk(false),2000);
+  }
+  return <button type="button" className="btn btn-ghost btn-sm" onClick={copy} style={{whiteSpace:'nowrap'}}>{ok?'✓ Copied':'Copy install link'}</button>;
+}
+
 function AuthScreen(){
   const [email,setEmail]=useState('');
   const [pass,setPass]=useState('');
@@ -528,6 +693,7 @@ function AuthScreen(){
           </form>
         )}
       </div>
+      <InstallBanner/>
     </div>
   );
 }
@@ -544,6 +710,7 @@ function MainApp({view,setView,session}){
     setUnreadMsgs(mc||0);
     const{count:wc}=await sb.from('ops_warnings').select('id',{count:'exact',head:true}).eq('status','submitted');
     setReviewWarnings(wc||0);
+    setAppBadgeCount((count||0)+(mc||0)+(wc||0));
     // Stores open but without an Ops account yet (need HQ approval)
     const[pRes,sRes]=await Promise.all([
       sb.from('profiles').select('store').eq('role','franchisee'),
@@ -600,7 +767,7 @@ function MainApp({view,setView,session}){
         {view==='review'&&<HQReview/>}
         {view==='messages'&&<HQMessages onBadgeRefresh={refreshBadges}/>}
         {view==='warnings'&&<HQWarnings onUpdate={refreshBadges}/>}
-        {view==='password'&&<ChangePassword onDone={()=>setView('dashboard')}/>}
+        {view==='password'&&<><ChangePassword onDone={()=>setView('dashboard')}/><PwaCards profile={{id:session.user.id,role:'hq',franchisee_id:null}}/></>}
         {view==='accounts'&&<AccountManager onBadgeRefresh={refreshBadges}/>}
         {view==='announce'&&<Announcements/>}
       </main>
@@ -2797,6 +2964,7 @@ function AccountManager({onBadgeRefresh}){
                       {busy===s.id?'Creating...':'Approve & Send Login →'}
                     </button>
                     <button className="btn btn-danger btn-sm" disabled={busy===s.id} onClick={()=>removePending(s)} style={{whiteSpace:'nowrap'}}>Delete</button>
+                    <CopyInstallLinkBtn/>
                   </div>
                   {msgs[s.id]&&(
                     <div style={{marginTop:10,fontSize:12,color:msgs[s.id].startsWith('✓')?'var(--green)':'var(--red)',padding:'10px 12px',background:msgs[s.id].startsWith('✓')?'rgba(95,184,122,.08)':'rgba(224,82,82,.08)',borderRadius:6,lineHeight:1.6,whiteSpace:'pre-wrap'}}>
@@ -3357,6 +3525,7 @@ function FranchiseePortal({session, profile}){
     const confirmedIds=new Set((rRes.data||[]).filter(r=>r.confirmed).map(r=>r.announcement_id));
     const unconfirmed=(aRes.data||[]).filter(a=>!confirmedIds.has(a.id)).length;
     setAnnounceCount(unconfirmed);
+    setAppBadgeCount(needsAction+unconfirmed+(hqc||0));
     // Warning history: My Standing tab only appears if this store has ever received a warning.
     // Tab visibility = ever received (warningCount). Nav badge = active warnings in last 12 months.
     const{data:wRows}=await sb.from('ops_warnings').select('status,issued_at,franchisee_seen_status').eq('franchisee_id',frId);
@@ -3417,7 +3586,7 @@ function FranchiseePortal({session, profile}){
         {portalView==='announce'&&<FranchiseeAnnouncements profile={profile} onUpdate={refreshBadges}/>}
         {portalView==='contact'&&<ContactHQ profile={profile} storeName={storeName} onSeen={refreshBadges}/>}
         {portalView==='warnings'&&warningCount>0&&<FranchiseeWarnings profile={profile} storeName={storeName} onUpdate={refreshBadges}/>}
-        {portalView==='password'&&<ChangePassword onDone={()=>setPortalView('tasks')}/>}
+        {portalView==='password'&&<><ChangePassword onDone={()=>setPortalView('tasks')}/><PwaCards profile={profile}/></>}
       </main>
       {botOpen&&<UglyBotModal onClose={()=>setBotOpen(false)}/>}
     </div>
