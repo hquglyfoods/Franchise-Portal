@@ -774,7 +774,7 @@ function MainApp({view,setView,session}){
         <div className="sidebar-footer">
           <div style={{marginBottom:4,fontSize:11,color:'var(--muted)'}}>{session.user.email}</div>
           <div style={{display:'flex',gap:10}}>
-            <button onClick={()=>setView('password')}>Change Password</button>
+            <button onClick={()=>setView('password')}>⚙ Settings</button>
             <button onClick={()=>sb.auth.signOut()} style={{color:'var(--red)'}}>Sign out</button>
           </div>
           <div style={{marginTop:6,fontSize:10,color:'var(--muted2)'}}>build 2026-06-24-v4</div>
@@ -2913,7 +2913,7 @@ function AccountManager({onBadgeRefresh}){
           </button>
         )}
         {/* Mobile app install: copy link for others / install this device */}
-        <div style={{marginBottom:16,display:'inline-flex',gap:8,flexWrap:'wrap'}}><CopyInstallLinkBtn label="📲 App install link"/><InstallAppBtn/></div>
+        <div style={{marginBottom:16,display:'inline-flex',gap:8,flexWrap:'wrap'}}><CopyInstallLinkBtn label="📲 Copy app install link"/><InstallAppBtn/></div>
 
         {/* Account list */}
         <input value={acctSearch} onChange={e=>setAcctSearch(e.target.value)} placeholder="Search name, store, role..."
