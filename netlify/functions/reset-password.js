@@ -24,6 +24,23 @@ async function getCaller(event) {
     return await r.json();
   } catch (e) { return null; }
 }
+async function userExistsByEmail(email) {
+  // The GoTrue admin API has no reliable server-side email filter across versions,
+  // so scan pages of users and match locally. Fail OPEN (return true) on any error
+  // so a lookup hiccup never silently blocks a real reset email.
+  const target = String(email).toLowerCase();
+  try {
+    for (let page = 1; page <= 20; page++) {
+      const r = await fetch(`${SUPA_URL}/auth/v1/admin/users?page=${page}&per_page=200`, { headers: { apikey: SUPA_SERVICE_KEY, Authorization: `Bearer ${SUPA_SERVICE_KEY}` } });
+      if (!r.ok) return true; // fail open
+      const data = await r.json();
+      const list = Array.isArray(data) ? data : (data.users || []);
+      if (list.some(u => (u.email || '').toLowerCase() === target)) return true;
+      if (list.length < 200) break; // last page
+    }
+    return false;
+  } catch (e) { return true; } // fail open
+}
 async function isHQ(userId) {
   try {
     const r = await fetch(`${SUPA_URL}/rest/v1/profiles?id=eq.${userId}&select=role,is_active`, { headers: { apikey: SUPA_SERVICE_KEY, Authorization: `Bearer ${SUPA_SERVICE_KEY}` } });
@@ -38,14 +55,23 @@ exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers, body: '' };
   if (event.httpMethod !== 'POST') return { statusCode: 405, headers, body: JSON.stringify({ error: 'Method Not Allowed' }) };
 
-  // Only an authenticated HQ user may trigger password-reset emails.
+  // Two modes:
+  //  - HQ mode: an authenticated HQ user resets someone else's password (Accounts screen).
+  //  - Self-serve mode: a logged-out user requests their own reset from the login screen.
+  //    We accept it but ONLY send if the email belongs to a real account, and we always
+  //    return the same neutral response so the endpoint can't be used to probe which
+  //    emails have accounts.
   const caller = await getCaller(event);
-  if (!caller) return { statusCode: 401, headers, body: JSON.stringify({ error: 'Authentication required' }) };
-  if (!(await isHQ(caller.id))) return { statusCode: 403, headers, body: JSON.stringify({ error: 'HQ access required' }) };
+  let selfServe = false;
+  if (!caller || !(await isHQ(caller.id))) selfServe = true;
 
   try {
     const { email, name } = JSON.parse(event.body || '{}');
     if (!email) return { statusCode: 400, headers, body: JSON.stringify({ error: 'email required' }) };
+    // In self-serve mode, silently no-op for unknown emails (neutral success response).
+    if (selfServe && !(await userExistsByEmail(email))) {
+      return { statusCode: 200, headers, body: JSON.stringify({ ok: true, selfServe: true }) };
+    }
     if (!SUPA_SERVICE_KEY) return { statusCode: 500, headers, body: JSON.stringify({ error: 'SUPABASE_SERVICE_KEY not set' }) };
     if (!RESEND_API_KEY) return { statusCode: 500, headers, body: JSON.stringify({ error: 'RESEND_API_KEY not set' }) };
 
@@ -101,7 +127,7 @@ exports.handler = async (event) => {
       return { statusCode: 400, headers, body: JSON.stringify({ error: sendData.message || 'Resend send failed', detail: sendData }) };
     }
 
-    return { statusCode: 200, headers, body: JSON.stringify({ ok: true }) };
+    return { statusCode: 200, headers, body: JSON.stringify({ ok: true, selfServe }) };
   } catch (err) {
     return { statusCode: 500, headers, body: JSON.stringify({ error: err.message || String(err) }) };
   }
