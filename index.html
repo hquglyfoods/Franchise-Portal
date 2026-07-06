@@ -283,11 +283,12 @@ body.modal-open{overflow:hidden;}
   .content{padding:14px;max-width:100%;}
   .content input,.content select,.content textarea{max-width:100%;width:100%;box-sizing:border-box;min-width:0;}
   .card input,.card select,.card textarea{max-width:100%;box-sizing:border-box;min-width:0;}
+  .modal input,.modal select,.modal textarea,.form-group input,.form-group select,.form-group textarea{max-width:100%;box-sizing:border-box;min-width:0;}
   /* date/time inputs on iOS default to an intrinsic width that overflows narrow cards */
   input[type="date"],input[type="time"],input[type="datetime-local"]{width:100%;max-width:100%;box-sizing:border-box;min-height:44px;-webkit-appearance:none;appearance:none;display:block;}
   /* iOS renders an empty date field with no intrinsic height; force it to align like other inputs */
-  input[type="date"]::-webkit-date-and-time-value{text-align:left;min-height:1.2em;}
-  input[type="date"]::-webkit-datetime-edit{min-height:1.2em;line-height:1.2;}
+  input[type="date"]::-webkit-date-and-time-value,input[type="datetime-local"]::-webkit-date-and-time-value{text-align:left;min-height:1.2em;}
+  input[type="date"]::-webkit-datetime-edit,input[type="datetime-local"]::-webkit-datetime-edit{min-height:1.2em;line-height:1.2;}
   /* two-column attachment grid collapses to one column so inputs don't overflow */
   .card [style*="grid-template-columns:1fr 1fr"],.card [style*="grid-template-columns: 1fr 1fr"]{grid-template-columns:1fr!important;}
   .filter-bar input{flex:1 1 100%;min-width:0!important;width:100%;}

@@ -253,7 +253,14 @@ td{padding:12px 16px;font-size:13px;vertical-align:middle;}
   .tb .tbadge{position:absolute;top:-2px;right:calc(50% - 18px);background:var(--red);color:#fff;font-size:8.5px;font-weight:800;min-width:15px;height:15px;border-radius:8px;display:flex;align-items:center;justify-content:center;padding:0 4px;}
   body{overscroll-behavior-y:contain;}
   .content{padding:14px;max-width:100%;}
-  .content input,.content select,.content textarea{max-width:100%;box-sizing:border-box;}
+  .content input,.content select,.content textarea{max-width:100%;width:100%;box-sizing:border-box;min-width:0;}
+  /* modal / card inputs must also stay inside their container (iOS date pickers overflow otherwise) */
+  .modal input,.modal select,.modal textarea,.card input,.card select,.card textarea,.form-group input,.form-group select,.form-group textarea{max-width:100%;box-sizing:border-box;min-width:0;}
+  input[type="date"],input[type="time"],input[type="datetime-local"]{width:100%;max-width:100%;box-sizing:border-box;min-height:44px;-webkit-appearance:none;appearance:none;display:block;}
+  input[type="date"]::-webkit-date-and-time-value,input[type="datetime-local"]::-webkit-date-and-time-value{text-align:left;min-height:1.2em;}
+  input[type="date"]::-webkit-datetime-edit,input[type="datetime-local"]::-webkit-datetime-edit{min-height:1.2em;line-height:1.2;}
+  /* collapse any 2-column grids inside cards/modals so paired inputs don't overflow */
+  .card [style*="grid-template-columns:1fr 1fr"],.card [style*="grid-template-columns: 1fr 1fr"],.modal [style*="grid-template-columns:1fr 1fr"],.modal [style*="grid-template-columns: 1fr 1fr"]{grid-template-columns:1fr!important;}
   .filter-bar input{flex:1 1 100%;min-width:0!important;width:100%;}
   .page-header{flex-wrap:wrap;gap:10px;}
   .page-header .btn{padding:9px 12px;font-size:12px;}
@@ -264,7 +271,12 @@ td{padding:12px 16px;font-size:13px;vertical-align:middle;}
   /* awaiting-signature rows: keep essentials on small screens */
   .fdd-terr,.fdd-date{display:none;}
   /* kanban: one column ≈ fills the screen, swipe to the next like flipping album cards */
-  .board-scroll{scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;scroll-padding-left:16px;padding-left:0;padding-right:16px;gap:14px!important;}
+  /* proximity (not mandatory) snap: swipe still settles one column at a time,
+     but dragging the scrollbar can fly across multiple columns to the far end in one motion */
+  .board-scroll{scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch;scroll-padding-left:16px;padding-left:0;padding-right:16px;gap:14px!important;scrollbar-width:auto;}
+  .board-scroll::-webkit-scrollbar{height:10px;}
+  .board-scroll::-webkit-scrollbar-thumb{background:var(--gold-dim);border-radius:5px;min-width:44px;}
+  .board-scroll::-webkit-scrollbar-track{background:var(--panel2);border-radius:5px;}
   .board-scroll>div{scroll-snap-align:center;min-width:82vw!important;max-width:82vw!important;}
   /* give columns real presence so they don't look stunted when a stage is empty */
   .board-col-body{min-height:180px;}
