@@ -901,6 +901,14 @@ function refreshBadges() {
   } catch (e) {}
 }
 
+function dismissNotif(tag) {
+  try {
+    tag && window.dispatchEvent(new CustomEvent("ops-dismiss", {
+      detail: tag
+    }))
+  } catch (e) {}
+}
+
 function ErrorLog() {
   const [e, t] = React.useState(null), [a, n] = React.useState(!1);
   async function r() {
@@ -2326,6 +2334,7 @@ function NotificationBell({
     })()
   }, [e.role, e.title]);
   const m = React.useCallback(e => !e.titles || !!c && e.titles.split(",").map(e => e.trim().toUpperCase()).includes(c.toUpperCase()), [c]),
+    [dz, setDz] = React.useState([]),
     p = React.useCallback(async () => {
       const {
         data: t
@@ -2347,7 +2356,13 @@ function NotificationBell({
         const {
           data: e
         } = await sb.from("notification_reads").select("last_seen").eq("user_id", a).maybeSingle();
-        l(e ? e.last_seen : null)
+        l(e ? e.last_seen : null);
+        try {
+          const {
+            data: dd
+          } = await sb.from("notification_dismissals").select("notification_tag").eq("user_id", a);
+          setDz((dd || []).map(x => x.notification_tag))
+        } catch (er) {}
       }
     }, [e.role, e.franchiseeId, m]);
   React.useEffect(() => {
@@ -2356,14 +2371,29 @@ function NotificationBell({
     const v = () => {
       "visible" === document.visibilityState && p()
     };
+    const dh = async ev => {
+      const tag = ev && ev.detail;
+      if (!tag || !s) return;
+      setDz(prev => prev.includes(tag) ? prev : [...prev, tag]);
+      try {
+        await sb.from("notification_dismissals").upsert([{
+          user_id: s,
+          notification_tag: tag,
+          dismissed_at: (new Date).toISOString()
+        }], {
+          onConflict: "user_id,notification_tag"
+        })
+      } catch (er) {}
+    };
     document.addEventListener("visibilitychange", v);
     window.addEventListener("focus", p);
     window.addEventListener("ops-refresh", p);
+    window.addEventListener("ops-dismiss", dh);
     return () => {
-      clearInterval(e), document.removeEventListener("visibilitychange", v), window.removeEventListener("focus", p), window.removeEventListener("ops-refresh", p)
+      clearInterval(e), document.removeEventListener("visibilitychange", v), window.removeEventListener("focus", p), window.removeEventListener("ops-refresh", p), window.removeEventListener("ops-dismiss", dh)
     }
-  }, [p]);
-  const u = n.filter(e => !o || new Date(e.created_at) > new Date(o)).length;
+  }, [p, s]);
+  const u = n.filter(e => (!o || new Date(e.created_at) > new Date(o)) && !(e.tag && dz.includes(e.tag))).length;
   return React.createElement("div", {
     className: "notif-wrap"
   }, React.createElement("button", {
@@ -2408,7 +2438,7 @@ function NotificationBell({
   }, 0 === n.length && React.createElement("div", {
     className: "notif-empty"
   }, "No notifications yet"), n.map(e => {
-    const t = !o || new Date(e.created_at) > new Date(o);
+    const t = (!o || new Date(e.created_at) > new Date(o)) && !(e.tag && dz.includes(e.tag));
     return React.createElement("div", {
       key: e.id,
       className: "notif-item" + (t ? " notif-new" : ""),
@@ -3760,7 +3790,7 @@ function Dashboard({
         hq_notes: t,
         reviewed_at: (new Date).toISOString(),
         reviewed_by: "HQ"
-      }).eq("id", e.id), refreshBadges(), b(t => t.filter(t => t.id !== e.id)), o(e => ({
+      }).eq("id", e.id), refreshBadges(), dismissNotif("review-" + e.id), b(t => t.filter(t => t.id !== e.id)), o(e => ({
         ...e,
         pending: e.pending - 1
       })))
@@ -3772,7 +3802,7 @@ function Dashboard({
         status: "approved",
         reviewed_at: (new Date).toISOString(),
         reviewed_by: "HQ"
-      }).eq("id", e.id), maybeCompleteTask(e.ops_task_id), refreshBadges(), b(t => t.filter(t => t.id !== e.id)), o(e => ({
+      }).eq("id", e.id), maybeCompleteTask(e.ops_task_id), refreshBadges(), dismissNotif("review-" + e.id), b(t => t.filter(t => t.id !== e.id)), o(e => ({
         ...e,
         pending: e.pending - 1
       }))
@@ -12336,6 +12366,7 @@ function FranchiseeTaskModal({
         }
         "approved" === t && maybeCompleteTask(e.ops_task_id);
         refreshBadges();
+        dismissNotif("reject-" + e.id);
         n()
       })() : (await reportError("submit_task_blocked", "Task submit updated 0 rows (likely a permission rule).", {
         severity: "high",
@@ -12374,7 +12405,7 @@ function FranchiseeAnnouncements({
     const {
       data: r
     } = await sb.from("ops_announcement_receipts").select("*").eq("franchisee_id", d);
-    s(r || []), refreshBadges(), t && t()
+    s(r || []), refreshBadges(), dismissNotif("ann-" + e), t && t()
   }
   useEffect(() => {
     !async function() {
