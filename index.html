@@ -895,6 +895,12 @@ function setAppBadgeCount(e) {
   } catch (e) {}
 }
 
+function refreshBadges() {
+  try {
+    window.dispatchEvent(new Event("ops-refresh"))
+  } catch (e) {}
+}
+
 function ErrorLog() {
   const [e, t] = React.useState(null), [a, n] = React.useState(!1);
   async function r() {
@@ -2346,8 +2352,16 @@ function NotificationBell({
     }, [e.role, e.franchiseeId, m]);
   React.useEffect(() => {
     p();
-    const e = setInterval(p, 6e4);
-    return () => clearInterval(e)
+    const e = setInterval(p, 25e3);
+    const v = () => {
+      "visible" === document.visibilityState && p()
+    };
+    document.addEventListener("visibilitychange", v);
+    window.addEventListener("focus", p);
+    window.addEventListener("ops-refresh", p);
+    return () => {
+      clearInterval(e), document.removeEventListener("visibilitychange", v), window.removeEventListener("focus", p), window.removeEventListener("ops-refresh", p)
+    }
   }, [p]);
   const u = n.filter(e => !o || new Date(e.created_at) > new Date(o)).length;
   return React.createElement("div", {
@@ -2514,8 +2528,16 @@ function MainApp({
   }, []);
   useEffect(() => {
     k();
-    const e = setInterval(k, 6e4);
-    return () => clearInterval(e)
+    const e = setInterval(k, 25e3);
+    const v = () => {
+      "visible" === document.visibilityState && k()
+    };
+    document.addEventListener("visibilitychange", v);
+    window.addEventListener("focus", k);
+    window.addEventListener("ops-refresh", k);
+    return () => {
+      clearInterval(e), document.removeEventListener("visibilitychange", v), window.removeEventListener("focus", k), window.removeEventListener("ops-refresh", k)
+    }
   }, [k]);
   const N = [{
     key: "dashboard",
@@ -3738,7 +3760,7 @@ function Dashboard({
         hq_notes: t,
         reviewed_at: (new Date).toISOString(),
         reviewed_by: "HQ"
-      }).eq("id", e.id), b(t => t.filter(t => t.id !== e.id)), o(e => ({
+      }).eq("id", e.id), refreshBadges(), b(t => t.filter(t => t.id !== e.id)), o(e => ({
         ...e,
         pending: e.pending - 1
       })))
@@ -3750,7 +3772,7 @@ function Dashboard({
         status: "approved",
         reviewed_at: (new Date).toISOString(),
         reviewed_by: "HQ"
-      }).eq("id", e.id), maybeCompleteTask(e.ops_task_id), b(t => t.filter(t => t.id !== e.id)), o(e => ({
+      }).eq("id", e.id), maybeCompleteTask(e.ops_task_id), refreshBadges(), b(t => t.filter(t => t.id !== e.id)), o(e => ({
         ...e,
         pending: e.pending - 1
       }))
@@ -10150,8 +10172,16 @@ function FranchiseePortal({
     }, [E]);
   useEffect(() => {
     x();
-    const e = setInterval(x, 6e4);
-    return () => clearInterval(e)
+    const e = setInterval(x, 25e3);
+    const v = () => {
+      "visible" === document.visibilityState && x()
+    };
+    document.addEventListener("visibilitychange", v);
+    window.addEventListener("focus", x);
+    window.addEventListener("ops-refresh", x);
+    return () => {
+      clearInterval(e), document.removeEventListener("visibilitychange", v), window.removeEventListener("focus", x), window.removeEventListener("ops-refresh", x)
+    }
   }, [x]), useEffect(() => {
     const e = () => {
       y("announce"), n("tasks"), window.scrollTo(0, 0)
@@ -12305,6 +12335,7 @@ function FranchiseeTaskModal({
           });
         }
         "approved" === t && maybeCompleteTask(e.ops_task_id);
+        refreshBadges();
         n()
       })() : (await reportError("submit_task_blocked", "Task submit updated 0 rows (likely a permission rule).", {
         severity: "high",
@@ -12343,7 +12374,7 @@ function FranchiseeAnnouncements({
     const {
       data: r
     } = await sb.from("ops_announcement_receipts").select("*").eq("franchisee_id", d);
-    s(r || []), t && t()
+    s(r || []), refreshBadges(), t && t()
   }
   useEffect(() => {
     !async function() {
