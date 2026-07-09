@@ -175,6 +175,21 @@ exports.handler = async (event) => {
       await logNotif({ role: 'hq' }, { title: 'Submitted for review', body: `${store}: ${title}`, tag: 'review-' + record.id, data: { url: '/#open=review&id=' + record.id } });
     }
 
+    // 1b) HQ rejects a submission -> notify that franchisee's devices
+    else if (table === 'ops_assignments' && type === 'UPDATE'
+             && record.status === 'rejected' && (!old_record || old_record.status !== 'rejected')) {
+      matched = 'task_rejected';
+      const subs = await subsForFranchisee(record.franchisee_id);
+      const badge = await frBadge(record.franchisee_id);
+      const tasks = await restJson(`ops_tasks?id=eq.${record.ops_task_id}&select=title`);
+      const title = tasks[0] ? tasks[0].title : 'a task';
+      const note = record.hq_notes ? String(record.hq_notes).slice(0, 120) : 'Please review HQ feedback and resubmit.';
+      sent = await fanout(subs, async () => ({
+        title: 'Changes requested', body: `${title}: ${note}`, tag: 'reject-' + record.id, badge, data: { url: '/#open=tasks&id=' + record.id },
+      }));
+      await logNotif({ role: 'franchisee', franchisee_id: record.franchisee_id }, { title: 'Changes requested', body: `${title}: ${note}`, tag: 'reject-' + record.id, data: { url: '/#open=tasks&id=' + record.id } });
+    }
+
     // 2) New announcement published -> all franchisee devices
     else if (table === 'ops_announcements' && type === 'INSERT' && record.status === 'active') {
       matched = 'announcement';
