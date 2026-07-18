@@ -246,6 +246,7 @@ td{padding:12px 16px;font-size:13px;vertical-align:middle;}
 
 /* ===== MOBILE RESPONSIVE ===== */
 @media (max-width:768px){
+  .terr-grid{grid-template-columns:1fr !important;}
   /* notification + account popups: fixed near the top so they never clip off-screen */
   .notif-panel{position:fixed;top:calc(58px + env(safe-area-inset-top));right:8px;left:8px;width:auto;max-width:none;max-height:64vh;}
   .acct-menu-panel{position:fixed;top:calc(58px + env(safe-area-inset-top));right:8px;left:auto;min-width:190px;}
@@ -1164,7 +1165,7 @@ function AccountMenu({
 }
 
 function App() {
-  const [e, t] = useState(null), [a, n] = useState(!0), l = ["dashboard", "board", "followups", "calendar", "leads", "franchisees", "team", "settings", "password"], [r, c] = useState(() => {
+  const [e, t] = useState(null), [a, n] = useState(!0), l = ["dashboard", "board", "followups", "calendar", "leads", "franchisees", "territory", "team", "settings", "password"], [r, c] = useState(() => {
     const e = (window.location.hash || "").match(/#open=([a-z]+)/);
     return e && l.includes(e[1]) ? e[1] : "dashboard"
   });
@@ -1386,6 +1387,10 @@ function MainApp({
     icon: "◍",
     label: "CRM Franchisees"
   }, {
+    key: "territory",
+    icon: "\uD83D\uDDFA",
+    label: "Territory"
+  }, {
     key: "team",
     icon: "◯",
     label: "Accounts"
@@ -1443,7 +1448,7 @@ function MainApp({
   }), "leads" === e && React.createElement(LeadCRM, {
     openLeadId: r,
     onConsumed: () => c(null)
-  }), "followups" === e && React.createElement(FollowUps, null), "franchisees" === e && React.createElement(FranchiseeTracker, null), "calendar" === e && React.createElement(CalendarView, null), "team" === e && React.createElement(TeamManager, null), "board" === e && React.createElement(PhaseBoard, null), "settings" === e && React.createElement(PhaseSettings, null), "password" === e && React.createElement(ChangePassword, {
+  }), "followups" === e && React.createElement(FollowUps, null), "franchisees" === e && React.createElement(FranchiseeTracker, null), "territory" === e && React.createElement(TerritoryManager, null), "calendar" === e && React.createElement(CalendarView, null), "team" === e && React.createElement(TeamManager, null), "board" === e && React.createElement(PhaseBoard, null), "settings" === e && React.createElement(PhaseSettings, null), "password" === e && React.createElement(ChangePassword, {
     onDone: () => t("dashboard")
   })), React.createElement("nav", {
     className: "tabbar"
@@ -2125,6 +2130,648 @@ function Dashboard({
       p(null), b(e => e + 1)
     }
   }))
+}
+
+function TerritoryManager() {
+  const [ready, setReady] = React.useState(false);
+  const [loadErr, setLoadErr] = React.useState("");
+  const [occupied, setOccupied] = React.useState([]); // [{zip,label}]
+  const [radius, setRadius] = React.useState(5);
+  const [occInput, setOccInput] = React.useState("");
+  const [checkInput, setCheckInput] = React.useState("");
+  const [results, setResults] = React.useState(null);
+  const [busy, setBusy] = React.useState(false);
+  const mapRef = React.useRef(null);
+  const mapObj = React.useRef(null);
+  const occLayer = React.useRef(null);
+  const chkLayer = React.useRef(null);
+  const coordsRef = React.useRef(null);
+
+  // ---- dynamic loaders (only when this tab opens) ----
+  function loadScript(src) {
+    return new Promise(function (res, rej) {
+      if (document.querySelector('script[data-terr="' + src + '"]')) return res();
+      const s = document.createElement("script");
+      s.src = src;
+      s.async = true;
+      s.setAttribute("data-terr", src);
+      s.onload = res;
+      s.onerror = function () {
+        rej(new Error("load " + src));
+      };
+      document.head.appendChild(s);
+    });
+  }
+  function loadCss(href) {
+    if (document.querySelector('link[data-terr="' + href + '"]')) return;
+    const l = document.createElement("link");
+    l.rel = "stylesheet";
+    l.href = href;
+    l.setAttribute("data-terr", href);
+    document.head.appendChild(l);
+  }
+  function parseCoords() {
+    if (coordsRef.current) return coordsRef.current;
+    const raw = window.ZIP_COORDS_RAW || "";
+    const map = {};
+    const parts = raw.split(";");
+    for (let i = 0; i < parts.length; i++) {
+      const p = parts[i],
+        c = p.indexOf(":");
+      if (c < 0) continue;
+      const zip = p.slice(0, c),
+        ll = p.slice(c + 1).split(",");
+      map[zip] = [parseInt(ll[0], 10) / 1000, parseInt(ll[1], 10) / 1000];
+    }
+    coordsRef.current = map;
+    return map;
+  }
+  function dist(la1, lo1, la2, lo2) {
+    const R = 3958.8,
+      rad = Math.PI / 180;
+    const dLa = (la2 - la1) * rad,
+      dLo = (lo2 - lo1) * rad;
+    const a = Math.sin(dLa / 2) * Math.sin(dLa / 2) + Math.cos(la1 * rad) * Math.cos(la2 * rad) * Math.sin(dLo / 2) * Math.sin(dLo / 2);
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  }
+  function extractZips(s) {
+    return (s || "").match(/\b\d{5}\b/g) || [];
+  }
+
+  // ---- load libs + data + saved territory on mount ----
+  React.useEffect(function () {
+    let alive = true;
+    (async function () {
+      try {
+        loadCss("https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css");
+        await loadScript("https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js");
+        await loadScript("/territory-zips.js");
+        parseCoords();
+        // load saved territory from Supabase
+        try {
+          const z = await sb.from("territory_zips").select("zip,label").order("zip");
+          if (alive && z.data) setOccupied(z.data.map(function (r) {
+            return {
+              zip: r.zip,
+              label: r.label
+            };
+          }));
+          const s = await sb.from("territory_settings").select("radius_miles").eq("id", 1).maybeSingle();
+          if (alive && s.data && s.data.radius_miles) setRadius(Number(s.data.radius_miles));
+        } catch (e) {}
+        if (alive) setReady(true);
+      } catch (e) {
+        if (alive) setLoadErr("Could not load the map libraries. Check your connection and try again.");
+      }
+    })();
+    return function () {
+      alive = false;
+    };
+  }, []);
+
+  // ---- init map once ready ----
+  React.useEffect(function () {
+    if (!ready || !mapRef.current || mapObj.current) return;
+    const L = window.L;
+    const m = L.map(mapRef.current, {
+      zoomControl: true,
+      attributionControl: false
+    }).setView([39.5, -98.35], 4);
+    L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
+      maxZoom: 19,
+      subdomains: "abcd"
+    }).addTo(m);
+    mapObj.current = m;
+    occLayer.current = L.layerGroup().addTo(m);
+    chkLayer.current = L.layerGroup().addTo(m);
+    setTimeout(function () {
+      m.invalidateSize();
+    }, 100);
+  }, [ready]);
+
+  // ---- redraw occupied whenever occupied/radius change ----
+  React.useEffect(function () {
+    if (!ready || !mapObj.current || !occLayer.current) return;
+    const L = window.L,
+      C = parseCoords();
+    occLayer.current.clearLayers();
+    const pts = [];
+    occupied.forEach(function (o) {
+      const c = C[o.zip];
+      if (!c) return;
+      pts.push(c);
+      L.circle([c[0], c[1]], {
+        radius: radius * 1609.34,
+        color: "#E0716A",
+        weight: 1,
+        fillColor: "#E0716A",
+        fillOpacity: 0.12
+      }).addTo(occLayer.current);
+      L.circleMarker([c[0], c[1]], {
+        radius: 5,
+        color: "#fff",
+        weight: 1.5,
+        fillColor: "#E0716A",
+        fillOpacity: 1
+      }).bindTooltip("Occupied " + o.zip + (o.label ? " · " + o.label : ""), {
+        direction: "top"
+      }).addTo(occLayer.current);
+    });
+    if (pts.length && !mapObj.current.__fitted) {
+      mapObj.current.fitBounds(pts, {
+        padding: [60, 60],
+        maxZoom: 7
+      });
+      mapObj.current.__fitted = true;
+    }
+  }, [ready, occupied, radius]);
+  async function addOccupied() {
+    const zips = extractZips(occInput);
+    if (!zips.length) return;
+    const C = parseCoords();
+    const existing = {};
+    occupied.forEach(function (o) {
+      existing[o.zip] = true;
+    });
+    const toAdd = zips.filter(function (z) {
+      return !existing[z];
+    }).map(function (z) {
+      return {
+        zip: z,
+        label: null
+      };
+    });
+    if (!toAdd.length) {
+      setOccInput("");
+      return;
+    }
+    setOccupied(occupied.concat(toAdd));
+    setOccInput("");
+    try {
+      let uid = null;
+      try {
+        const s = await sb.auth.getSession();
+        uid = s && s.data && s.data.session && s.data.session.user ? s.data.session.user.id : null;
+      } catch (e) {}
+      await sb.from("territory_zips").upsert(toAdd.map(function (o) {
+        return {
+          zip: o.zip,
+          created_by: uid
+        };
+      }), {
+        onConflict: "zip"
+      });
+    } catch (e) {}
+  }
+  async function removeOccupied(zip) {
+    setOccupied(occupied.filter(function (o) {
+      return o.zip !== zip;
+    }));
+    try {
+      await sb.from("territory_zips").delete().eq("zip", zip);
+    } catch (e) {}
+  }
+  async function changeRadius(v) {
+    const n = Math.max(1, Math.min(50, Number(v) || 5));
+    setRadius(n);
+    try {
+      await sb.from("territory_settings").upsert([{
+        id: 1,
+        radius_miles: n,
+        updated_at: new Date().toISOString()
+      }], {
+        onConflict: "id"
+      });
+    } catch (e) {}
+  }
+  function runCheck() {
+    const C = parseCoords();
+    const zips = extractZips(checkInput);
+    if (!zips.length) {
+      setResults({
+        empty: true
+      });
+      return;
+    }
+    const L = window.L;
+    if (chkLayer.current) chkLayer.current.clearLayers();
+    let okN = 0,
+      noN = 0;
+    const rows = [];
+    const bounds = [];
+    zips.forEach(function (z) {
+      const c = C[z];
+      if (!c) {
+        rows.push({
+          zip: z,
+          unknown: true
+        });
+        return;
+      }
+      bounds.push(c);
+      let nearest = null,
+        nd = Infinity;
+      occupied.forEach(function (o) {
+        const oc = C[o.zip];
+        if (!oc) return;
+        const d = dist(c[0], c[1], oc[0], oc[1]);
+        if (d < nd) {
+          nd = d;
+          nearest = o.zip;
+        }
+      });
+      const prot = nearest !== null && nd <= radius;
+      const col = prot ? "#E3BE64" : "#5FB87A";
+      if (chkLayer.current) {
+        L.circleMarker([c[0], c[1]], {
+          radius: 6,
+          color: "#fff",
+          weight: 1.5,
+          fillColor: col,
+          fillOpacity: 1
+        }).bindTooltip(z + (prot ? " · Protected" : " · Available"), {
+          direction: "top"
+        }).addTo(chkLayer.current);
+      }
+      if (prot) {
+        noN++;
+        rows.push({
+          zip: z,
+          protected: true,
+          nd: nd,
+          near: nearest,
+          lat: c[0],
+          lng: c[1]
+        });
+      } else {
+        okN++;
+        rows.push({
+          zip: z,
+          available: true,
+          nd: nearest !== null ? nd : null,
+          near: nearest,
+          lat: c[0],
+          lng: c[1]
+        });
+      }
+    });
+    setResults({
+      okN: okN,
+      noN: noN,
+      rows: rows
+    });
+    if (bounds.length && mapObj.current) {
+      const allPts = bounds.concat(occupied.map(function (o) {
+        return C[o.zip];
+      }).filter(Boolean));
+      mapObj.current.fitBounds(allPts, {
+        padding: [50, 50],
+        maxZoom: 9
+      });
+    }
+  }
+  function flyTo(lat, lng) {
+    if (mapObj.current) mapObj.current.setView([lat, lng], 10);
+  }
+  const cardStyle = {
+    background: "var(--panel)",
+    border: "1px solid var(--border)",
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 14
+  };
+  const h2Style = {
+    fontSize: 13,
+    margin: "0 0 10px",
+    display: "flex",
+    alignItems: "center",
+    gap: 7,
+    color: "var(--text)"
+  };
+  const inputStyle = {
+    width: "100%",
+    fontFamily: "inherit",
+    fontSize: 13.5,
+    background: "var(--panel2)",
+    border: "1px solid var(--border2)",
+    borderRadius: 9,
+    padding: "10px 11px",
+    color: "var(--text)"
+  };
+  const goldBtn = {
+    fontFamily: "inherit",
+    fontSize: 12.5,
+    fontWeight: 700,
+    border: "none",
+    borderRadius: 9,
+    padding: "10px 14px",
+    cursor: "pointer",
+    whiteSpace: "nowrap",
+    background: "var(--gold)",
+    color: "var(--ink)"
+  };
+  if (loadErr) {
+    return React.createElement("div", {
+      style: {
+        padding: 24,
+        color: "var(--muted)"
+      }
+    }, loadErr);
+  }
+  return React.createElement("div", {
+    style: {
+      padding: "4px 2px 40px"
+    }
+  }, React.createElement("h1", {
+    style: {
+      fontSize: 22,
+      margin: "0 0 4px",
+      color: "var(--text)"
+    }
+  }, "Territory Manager"), React.createElement("p", {
+    style: {
+      fontSize: 13,
+      color: "var(--muted)",
+      margin: "0 0 18px"
+    }
+  }, "Occupied zips are plotted with their protection radius. Check any prospect zip against the rule."), !ready ? React.createElement("div", {
+    style: {
+      padding: 40,
+      textAlign: "center",
+      color: "var(--muted)",
+      fontSize: 13
+    }
+  }, "Loading map and zip data\u2026") : React.createElement("div", {
+    style: {
+      display: "grid",
+      gridTemplateColumns: "1fr 340px",
+      gap: 16,
+      alignItems: "start"
+    },
+    className: "terr-grid"
+  }, React.createElement("div", null, React.createElement("div", {
+    ref: mapRef,
+    style: {
+      height: 520,
+      borderRadius: 14,
+      border: "1px solid var(--border)",
+      background: "#0A1514"
+    }
+  }), React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 14,
+      fontSize: 11.5,
+      color: "var(--muted)",
+      marginTop: 10,
+      flexWrap: "wrap"
+    }
+  }, legendDot("#E0716A", "Occupied + radius"), legendDot("#5FB87A", "Available"), legendDot("#E3BE64", "Protected"))), React.createElement("div", null,
+  // radius
+  React.createElement("div", {
+    style: cardStyle
+  }, React.createElement("h2", {
+    style: h2Style
+  }, "\u2699\uFE0F Protection radius"), React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 8
+    }
+  }, React.createElement("input", {
+    type: "number",
+    value: radius,
+    min: 1,
+    max: 50,
+    onChange: function (e) {
+      changeRadius(e.target.value);
+    },
+    style: Object.assign({}, inputStyle, {
+      width: 70,
+      textAlign: "center"
+    })
+  }), React.createElement("span", {
+    style: {
+      fontSize: 12.5,
+      color: "var(--muted)"
+    }
+  }, "miles"))),
+  // occupied
+  React.createElement("div", {
+    style: cardStyle
+  }, React.createElement("h2", {
+    style: h2Style
+  }, "\uD83D\uDCCD Occupied zips"), React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8
+    }
+  }, React.createElement("input", {
+    value: occInput,
+    onChange: function (e) {
+      setOccInput(e.target.value);
+    },
+    onKeyDown: function (e) {
+      if (e.key === "Enter") addOccupied();
+    },
+    placeholder: "e.g. 77584, 10001",
+    style: Object.assign({}, inputStyle, {
+      flex: 1
+    })
+  }), React.createElement("button", {
+    onClick: addOccupied,
+    style: goldBtn
+  }, "Add")), React.createElement("div", {
+    style: {
+      display: "flex",
+      flexWrap: "wrap",
+      gap: 5,
+      marginTop: 10
+    }
+  }, occupied.map(function (o) {
+    return React.createElement("span", {
+      key: o.zip,
+      style: {
+        fontSize: 11.5,
+        background: "var(--panel2)",
+        border: "1px solid var(--border2)",
+        borderRadius: 14,
+        padding: "3px 8px 3px 10px",
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 5,
+        color: "var(--text)"
+      }
+    }, React.createElement("b", null, o.zip), React.createElement("span", {
+      onClick: function () {
+        removeOccupied(o.zip);
+      },
+      style: {
+        cursor: "pointer",
+        color: "var(--muted)"
+      }
+    }, "\u00D7"));
+  })), React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: "var(--muted)",
+      marginTop: 8
+    }
+  }, occupied.length + " occupied zip" + (occupied.length === 1 ? "" : "s"))),
+  // check
+  React.createElement("div", {
+    style: cardStyle
+  }, React.createElement("h2", {
+    style: h2Style
+  }, "\uD83D\uDD0E Check availability"), React.createElement("textarea", {
+    value: checkInput,
+    onChange: function (e) {
+      setCheckInput(e.target.value);
+    },
+    placeholder: "e.g. 77581, 77578, 77545",
+    style: Object.assign({}, inputStyle, {
+      minHeight: 70,
+      resize: "vertical",
+      lineHeight: 1.5
+    })
+  }), React.createElement("button", {
+    onClick: runCheck,
+    style: Object.assign({}, goldBtn, {
+      marginTop: 10,
+      width: "100%"
+    })
+  }, "Check"), results ? renderResults(results, flyTo) : null))));
+  function legendDot(color, label) {
+    return React.createElement("span", {
+      style: {
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 5
+      }
+    }, React.createElement("span", {
+      style: {
+        width: 11,
+        height: 11,
+        borderRadius: "50%",
+        background: color,
+        display: "inline-block"
+      }
+    }), label);
+  }
+}
+function renderResults(r, flyTo) {
+  if (r.empty) return React.createElement("div", {
+    style: {
+      fontSize: 11.5,
+      color: "var(--muted)",
+      marginTop: 10
+    }
+  }, "Enter at least one 5-digit zip.");
+  const statStyle = {
+    flex: 1,
+    background: "var(--panel2)",
+    border: "1px solid var(--border2)",
+    borderRadius: 10,
+    padding: 9,
+    textAlign: "center"
+  };
+  return React.createElement("div", null, React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      marginTop: 12
+    }
+  }, React.createElement("div", {
+    style: statStyle
+  }, React.createElement("div", {
+    style: {
+      fontSize: 19,
+      fontWeight: 800,
+      color: "var(--green)"
+    }
+  }, r.okN), React.createElement("div", {
+    style: {
+      fontSize: 9.5,
+      color: "var(--muted)",
+      textTransform: "uppercase",
+      marginTop: 1
+    }
+  }, "Available")), React.createElement("div", {
+    style: statStyle
+  }, React.createElement("div", {
+    style: {
+      fontSize: 19,
+      fontWeight: 800,
+      color: "var(--red)"
+    }
+  }, r.noN), React.createElement("div", {
+    style: {
+      fontSize: 9.5,
+      color: "var(--muted)",
+      textTransform: "uppercase",
+      marginTop: 1
+    }
+  }, "Protected"))), React.createElement("div", {
+    style: {
+      marginTop: 10,
+      border: "1px solid var(--border2)",
+      borderRadius: 10,
+      overflow: "hidden"
+    }
+  }, r.rows.map(function (row, k) {
+    const clickable = !row.unknown;
+    return React.createElement("div", {
+      key: k,
+      onClick: clickable ? function () {
+        flyTo(row.lat, row.lng);
+      } : null,
+      style: {
+        padding: "10px 12px",
+        display: "flex",
+        gap: 10,
+        alignItems: "flex-start",
+        borderBottom: "1px solid var(--border)",
+        background: "var(--panel2)",
+        cursor: clickable ? "pointer" : "default"
+      }
+    }, React.createElement("div", {
+      style: {
+        flexShrink: 0,
+        width: 22,
+        height: 22,
+        borderRadius: 6,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        fontSize: 12,
+        fontWeight: 800,
+        background: row.unknown ? "rgba(147,161,154,.16)" : row.protected ? "rgba(224,113,106,.16)" : "rgba(95,184,122,.16)",
+        color: row.unknown ? "var(--muted)" : row.protected ? "var(--red)" : "var(--green)"
+      }
+    }, row.unknown ? "?" : row.protected ? "\u2715" : "\u2713"), React.createElement("div", null, React.createElement("div", {
+      style: {
+        fontSize: 14,
+        fontWeight: 800,
+        color: "var(--text)"
+      }
+    }, row.zip), React.createElement("div", {
+      style: {
+        fontSize: 11.5,
+        color: "var(--muted)",
+        marginTop: 1
+      }
+    }, row.unknown ? "Not found in database." : row.protected ? React.createElement(React.Fragment, null, React.createElement("span", {
+      style: {
+        color: "var(--red)",
+        fontWeight: 700
+      }
+    }, "Protected"), " \u00B7 " + row.nd.toFixed(1) + " mi from " + row.near) : React.createElement(React.Fragment, null, React.createElement("span", {
+      style: {
+        color: "var(--green)",
+        fontWeight: 700
+      }
+    }, "Available"), row.nd !== null ? " \u00B7 nearest " + row.near + " " + row.nd.toFixed(1) + " mi" : ""))));
+  })));
 }
 
 function CalendarView() {
