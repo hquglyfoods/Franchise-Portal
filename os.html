@@ -246,7 +246,12 @@ td{padding:12px 16px;font-size:13px;vertical-align:middle;}
 
 /* ===== MOBILE RESPONSIVE ===== */
 @media (max-width:768px){
-  .terr-grid{grid-template-columns:1fr !important;}
+  .terr-grid{grid-template-columns:1fr !important;display:flex !important;flex-direction:column;}
+  .terr-map-col{order:4;}
+  .terr-cards-col{display:contents;}
+  .terr-card-check{order:1;}
+  .terr-card-radius{order:2;}
+  .terr-card-occupied{order:3;}
   /* notification + account popups: fixed near the top so they never clip off-screen */
   .notif-panel{position:fixed;top:calc(58px + env(safe-area-inset-top));right:8px;left:8px;width:auto;max-width:none;max-height:64vh;}
   .acct-menu-panel{position:fixed;top:calc(58px + env(safe-area-inset-top));right:8px;left:auto;min-width:190px;}
@@ -340,8 +345,8 @@ td{padding:12px 16px;font-size:13px;vertical-align:middle;}
   .sidebar-footer button{white-space:nowrap;}
   .sidebar-footer .build-stamp{display:none;}
   /* nav becomes a button grid (app-like), not a scrolling tab row */
-  .sidebar .nav{display:grid!important;grid-template-columns:repeat(3,1fr);gap:7px;padding:4px 0 10px;overflow:visible;flex:none;width:100%;order:3;}
-  .nav-item{position:relative;display:flex;align-items:center;justify-content:center;text-align:center;white-space:normal;line-height:1.15;width:auto!important;min-height:34px;padding:5px 6px;font-size:12px;font-weight:600;border:1px solid var(--border2)!important;border-radius:9px;background:var(--panel2);margin:0!important;}
+  .sidebar .nav{display:grid!important;grid-template-columns:repeat(4,1fr);gap:6px;padding:4px 0 10px;overflow:visible;flex:none;width:100%;order:3;}
+  .nav-item{position:relative;display:flex;align-items:center;justify-content:center;text-align:center;white-space:normal;line-height:1.1;width:auto!important;min-height:34px;padding:5px 3px;font-size:11px;font-weight:600;border:1px solid var(--border2)!important;border-radius:9px;background:var(--panel2);margin:0!important;}
   .nav-item:hover{background:var(--panel2);}
   .nav-item.active{background:rgba(204,156,58,.15);border-color:var(--gold)!important;color:var(--gold-light);}
   .nav-icon{display:none!important;}
@@ -1385,7 +1390,7 @@ function MainApp({
   }, {
     key: "franchisees",
     icon: "◍",
-    label: "CRM Franchisees"
+    label: "Franchisees"
   }, {
     key: "territory",
     icon: "\uD83D\uDDFA",
@@ -1397,7 +1402,7 @@ function MainApp({
   }, {
     key: "settings",
     icon: "◎",
-    label: "Phase Settings"
+    label: "Phase"
   }];
   return React.createElement("div", {
     className: "app"
@@ -2237,7 +2242,7 @@ function TerritoryManager() {
       zoomControl: true,
       attributionControl: false
     }).setView([39.5, -98.35], 4);
-    L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
+    L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
       maxZoom: 19,
       subdomains: "abcd"
     }).addTo(m);
@@ -2509,13 +2514,15 @@ function TerritoryManager() {
       alignItems: "start"
     },
     className: "terr-grid"
-  }, React.createElement("div", null, React.createElement("div", {
+  }, React.createElement("div", {
+    className: "terr-map-col"
+  }, React.createElement("div", {
     ref: mapRef,
     style: {
       height: 520,
       borderRadius: 14,
       border: "1px solid var(--border)",
-      background: "#0A1514"
+      background: "#E8E4DC"
     }
   }), React.createElement("div", {
     style: {
@@ -2526,10 +2533,13 @@ function TerritoryManager() {
       marginTop: 10,
       flexWrap: "wrap"
     }
-  }, legendDot("#E0716A", "Occupied + radius"), legendDot("#5FB87A", "Available"), legendDot("#E3BE64", "Protected"))), React.createElement("div", null,
+  }, legendDot("#E0716A", "Occupied + radius"), legendDot("#5FB87A", "Available"), legendDot("#E3BE64", "Protected"))), React.createElement("div", {
+    className: "terr-cards-col"
+  },
   // radius
   React.createElement("div", {
-    style: cardStyle
+    style: cardStyle,
+    className: "terr-card-radius"
   }, React.createElement("h2", {
     style: h2Style
   }, "\u2699\uFE0F Protection radius"), React.createElement("div", {
@@ -2558,7 +2568,8 @@ function TerritoryManager() {
   }, "miles"))),
   // occupied
   React.createElement("div", {
-    style: cardStyle
+    style: cardStyle,
+    className: "terr-card-occupied"
   }, React.createElement("h2", {
     style: h2Style
   }, "\uD83D\uDCCD Occupied zips"), React.createElement("div", {
@@ -2620,7 +2631,8 @@ function TerritoryManager() {
   }, occupied.length + " occupied zip" + (occupied.length === 1 ? "" : "s"))),
   // check
   React.createElement("div", {
-    style: cardStyle
+    style: cardStyle,
+    className: "terr-card-check"
   }, React.createElement("h2", {
     style: h2Style
   }, "\uD83D\uDD0E Check availability"), React.createElement("textarea", {
