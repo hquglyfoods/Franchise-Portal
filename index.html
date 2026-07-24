@@ -4110,7 +4110,9 @@ function TaskDetailModal({
     style: {
       fontSize: 12,
       color: "var(--muted)",
-      marginTop: 3
+      marginTop: 3,
+      whiteSpace: "pre-wrap",
+      lineHeight: 1.5
     }
   }, e.description)), React.createElement("button", {
     className: "close-btn",
@@ -4317,7 +4319,9 @@ function TaskDetailModal({
     style: {
       fontSize: 11,
       color: "var(--muted)",
-      marginTop: 2
+      marginTop: 2,
+      whiteSpace: "pre-wrap",
+      lineHeight: 1.5
     }
   }, e.description)), React.createElement("div", {
     style: {
@@ -5058,10 +5062,16 @@ function BroadcastTask({
     style: {
       marginBottom: 0
     }
-  }, React.createElement("label", null, "Description (optional)"), React.createElement("input", {
+  }, React.createElement("label", null, "Description (optional)"), React.createElement("textarea", {
     value: e.description,
     onChange: e => g(t, "description", e.target.value),
-    placeholder: "Additional context..."
+    rows: 3,
+    placeholder: "Additional context...",
+    style: {
+      resize: "vertical",
+      lineHeight: 1.5,
+      fontFamily: "inherit"
+    }
   }))), React.createElement("div", {
     style: {
       marginTop: 10
@@ -12475,7 +12485,9 @@ function FranchiseeTaskModal({
     style: {
       fontSize: 12,
       color: "var(--muted)",
-      marginTop: 3
+      marginTop: 3,
+      whiteSpace: "pre-wrap",
+      lineHeight: 1.5
     }
   }, e.ops_tasks.description)), React.createElement("button", {
     className: "close-btn",
@@ -12582,7 +12594,9 @@ function FranchiseeTaskModal({
       style: {
         fontSize: 11,
         color: "var(--muted)",
-        marginTop: 2
+        marginTop: 2,
+        whiteSpace: "pre-wrap",
+        lineHeight: 1.5
       }
     }, t.description), t.links && t.links.length > 0 && React.createElement("div", {
       style: {
